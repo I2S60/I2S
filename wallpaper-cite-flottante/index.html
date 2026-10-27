@@ -29,7 +29,7 @@
 (() => {
 'use strict';
 
-const BUILD = 'v2.4';
+const BUILD = 'v2.5';
 const QS = new URLSearchParams(location.search);   // paramètres de test : ?dragon et ?monster font apparaître les créatures tout de suite   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
@@ -746,7 +746,7 @@ function buildIslands() {
     // Cascade qui tombe du bord de l'île
     // Cascades : une par-dessus le bord (selon l'île), plus des chutes qui jaillissent du flanc du rocher
     const falls = d.fall ? [{ x: d.fall * 47.5, y: hill(d.fall * 47.5) + 0.5, side: d.fall, len: 42 + r() * 26, w: 1.0 }] : [];
-    const extra = d.size >= 0.2 ? 1 : d.size >= 0.1 ? (r() < 0.5 ? 1 : 0) : 0;     // peu de cascades : une sur l'île principale, parfois une sur une île moyenne
+    const extra = d.size >= 0.2 ? 0 : d.size >= 0.1 ? (r() < 0.5 ? 1 : 0) : 0;     // aucune cascade sur la grande île du centre     // peu de cascades : une sur l'île principale, parfois une sur une île moyenne
     for (let k = 0; k < extra; k++) {
       const u = k % 2 ? under[14 - ((r() * 3) | 0)] : under[1 + ((r() * 3) | 0)];     // flanc du rocher, partie haute
       falls.push({ x: u.x, y: u.y, side: u.x < 0 ? -1 : 1, len: 46 + r() * 22, w: 1.1 + r() * 0.3 });
@@ -1802,7 +1802,7 @@ function drawFog(sky) {
 let fogWisps = [];
 
 /* ==========================================================================
-   8c. BATEAUX SUR LE LAC (6 types) ET MONSTRE MARIN
+   8c. BATEAUX SUR LE LAC
    ========================================================================== */
 const mkPath = f => { const p = new Path2D(); f(p); return p; };
 // Type 0 : voilier (grand-voile à l'arrière, foc à l'avant) — la proue est à droite
@@ -2043,20 +2043,19 @@ function drawBoats(sky) {
 }
 
 /* --------------------------------------------------------------------------
-   Monstre marin : un serpent de lac sort parfois de l'eau (cou, tête, bosses du dos),
-   puis replonge dans les remous. Il revient toutes les 35 à 80 secondes.
+   Monstre marin : un serpent de lac sort rarement de l'eau, nage, frappe l'eau de sa queue puis replonge
    -------------------------------------------------------------------------- */
 let monster = { active: false, wait: QS.has('monster') ? 0.2 : 75 };   // rare : toutes les 2 à 5 minutes environ
-const MONSTER_ACTS = ['roar', 'tailslap', 'lunge', 'spout'];
-// Chaque apparition dure 24 à 32 s : il émerge, nage en travers du lac, enchaîne trois comportements tirés au sort
-// (rugissement, claque de queue, bond en avant, jet d'eau) puis plonge en arche
+const MONSTER_ACTS = ['tailslap', 'lunge'];                            // comportements : claque de queue et bond du cou
+// Chaque apparition dure 24 à 32 s : il émerge, nage en travers du lac, fait une claque de queue et un bond du cou
+// puis plonge en arche (aucun effet particulier au niveau de la tête)
 function spawnMonster() {
   const f = 0.3 + crR() * 0.5, dir = crR() < 0.5 ? -1 : 1, travel = W * (0.12 + crR() * 0.12);
   const acts = MONSTER_ACTS.slice().sort(() => crR() - 0.5).slice(0, 3);
   monster = { active: true, t0: T, dur: 24 + crR() * 8, dir, travel,
               x: clamp((0.2 + crR() * 0.6) * W, W * 0.15 + (dir < 0 ? travel : 0), W * 0.85 - (dir > 0 ? travel : 0)),
               y: HZ + (H - HZ) * (0.18 + f * 0.62), sc: U * (0.0014 + 0.0017 * f), ph: crR() * 6.28, wait: 0,
-              events: acts.map((kind, i) => ({ kind, u0: 0.2 + i * 0.22 + crR() * 0.04, du: 0.075 })) };
+              events: acts.map((kind, i) => ({ kind, u0: 0.28 + i * 0.3 + crR() * 0.04, du: 0.075 })) };
 }
 function updateMonster(dt) {
   if (monster.active) { if (T - monster.t0 > monster.dur) { monster.active = false; monster.wait = 140 + crR() * 160; } }
@@ -2069,7 +2068,7 @@ function drawMonster(sky) {
   const up = smooth(clamp(u / 0.1, 0, 1)), dive = smooth(clamp((u - 0.88) / 0.12, 0, 1));   // sortie de l'eau, puis plongeon
   if (up < 0.01 || u > 1) return;
   // intensité de chaque comportement (0 à 1) et avancement de l'éclaboussure après la claque de queue
-  const ev = { roar: 0, tailslap: 0, lunge: 0, spout: 0 };
+  const ev = { tailslap: 0, lunge: 0 };
   let splash = -1;
   for (const e of m.events) {
     ev[e.kind] = Math.sin(Math.PI * clamp((u - e.u0) / e.du, 0, 1));
@@ -2085,8 +2084,7 @@ function drawMonster(sky) {
   const hx = xc + dir * (9 * (0.5 + 0.5 * up) + 17 * ev.lunge + 20 * dive) * sc + sway, hy = wy - Hn;
   const cx = xc - dir * (6 - 4 * ev.lunge) * sc, cy = wy - Hn * 0.7;
   const nb = t => [(1 - t) * (1 - t) * xc + 2 * (1 - t) * t * cx + t * t * hx, (1 - t) * (1 - t) * wy + 2 * (1 - t) * t * cy + t * t * hy];
-  const headRot = 0.2 + 0.07 * Math.sin(T * 0.8 + m.ph) - ev.roar * 0.55 + dive * 0.85 + ev.lunge * 0.25;   // tête renversée quand il rugit
-  const mouth = sc * (0.55 * (0.5 + 0.5 * Math.sin(T * 1.7 + m.ph)) + ev.roar * 2.1);                      // gueule grande ouverte
+  const headRot = 0.2 + 0.07 * Math.sin(T * 0.8 + m.ph) + dive * 0.85 + ev.lunge * 0.25;   // tête renversée quand il rugit
   // queue : se redresse et frappe l'eau
   const tb = [xc - dir * 28 * sc, wy], tc = [xc - dir * 34 * sc, wy - 8 * sc * (up + ev.tailslap * 2)];
   const tt = [xc - dir * 38 * sc, wy - (6 * up + 24 * ev.tailslap) * sc];
@@ -2114,9 +2112,7 @@ function drawMonster(sky) {
     ctx.translate(hx, hy); ctx.scale(dir, 1); ctx.rotate(headRot);
     ctx.beginPath(); ctx.ellipse(sc * 0.4, 0, sc * 3.1, sc * 1.7, 0, 0, 6.2832); ctx.fill();
     ctx.beginPath(); ctx.ellipse(sc * 3.5, sc * 0.35, sc * 2.4, sc * 1.0, 0.08, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(sc * 3.2, sc * 1.35 + mouth, sc * 2.0, sc * 0.5, 0.18 + mouth / (sc * 6), 0, 6.2832); ctx.fill();
     ctx.beginPath(); ctx.moveTo(-sc * 1.0, -sc * 1.4); ctx.lineTo(-sc * 3.6, -sc * 3.4); ctx.lineTo(-sc * 0.1, -sc * 1.7); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-sc * 1.5, -sc * 0.6); ctx.lineTo(-sc * 4.4, -sc * 1.2); ctx.lineTo(-sc * 3.6, sc * 0.6); ctx.lineTo(-sc * 1.6, sc * 1.0); ctx.fill();
     ctx.restore();
     for (let k = 0; k < 3; k++) {                                     // bosses du dos qui ondulent, elles se cambrent au plongeon
       const hh = sc * (5.6 - k * 1.2) * up * (1 + 0.5 * Math.sin(Math.PI * dive)) * (1 - dive * 0.85) * (0.55 + 0.45 * Math.sin(T * 1.6 - k * 1.3 + m.ph));
@@ -2166,23 +2162,6 @@ function drawMonster(sky) {
     ctx.beginPath(); ctx.ellipse(tt[0], wy + sc * 0.4, sc * (4 + splash * 20), sc * (1 + splash * 5), 0, 0, 6.2832); ctx.stroke();
     drops(22, tt[0], wy, 14, (1 - splash) * 1.1, 3.4);
   }
-  if (ev.spout > 0.05) drops(18, hx, hy - sc, 12, ev.spout * 1.0, 1.8);                     // jet d'eau jaillissant de la tête
-  if (ev.roar > 0.05) {                                                                      // vapeur qui s'échappe de la gueule
-    ctx.fillStyle = rgb(foam, 0.5);
-    for (let i = 0; i < 7; i++) {
-      const q = (T * 1.6 + i / 7) % 1;
-      ctx.globalAlpha = ev.roar * (1 - q) * 0.6;
-      ctx.beginPath(); ctx.arc(hx + dir * sc * (4.5 + q * 9), hy - sc * (0.5 + q * 5), sc * (0.8 + q * 2.4), 0, 6.2832); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-  // Œil rougeoyant la nuit
-  const night = clamp(sky.star * 1.2, 0, 1);
-  if (night > 0.05) {
-    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = night * env * 0.9;
-    const s = sc * 4.5; ctx.drawImage(GLOW_FIRE, hx + dir * sc * 1.5 - s / 2, hy - sc * 0.2 - s / 2, s, s);
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-  }
 }
 
 /* ==========================================================================
@@ -2227,7 +2206,7 @@ function flockSlots(kind, n, w) {
 // Chaque volée part d'une formation et se transforme lentement vers une autre (mélange A -> B),
 // avec sa propre taille, vitesse, altitude et nombre d'oiseaux : elles ne se ressemblent jamais
 // Trajectoires des oiseaux : ligne droite, ondulation, piqué, zigzag, vol plané, ou ronde autour d'une île
-const FLIGHT_PATHS = ['straight', 'wave', 'swoop', 'zigzag', 'soar', 'orbit'];
+const FLIGHT_PATHS = ['straight', 'wave', 'wave', 'soar'];                 // trajectoires douces : jamais de zigzag ni de piqué brusque
 // Décalage vertical (px) de la trajectoire à l'instant t depuis le début du vol
 function pathOffset(f, t) {
   const A = f.amp;
@@ -2251,12 +2230,13 @@ function spawnFlock(f, onScreen) {
   f.v = (22 + crR() * 50) * (U / 1920); f.y = (0.07 + crR() * 0.34) * H; f.ph = crR() * 6.28;
   // Style de battement : continu, par salves ou longs planés ; les rapaces solitaires planent surtout
   const style = crR();
-  f.glideBias = solo ? 1.2 : style < 0.3 ? -0.8 : style < 0.7 ? 0 : 0.9;
+  f.glideBias = solo ? 1.0 : style < 0.5 ? -0.2 : 0.4;
   f.flapScale = clamp(U * 0.0035 / f.w, 0.6, 1.4);                     // les gros oiseaux battent plus lentement
   // Trajectoire et variations de vitesse (rafales)
   f.path = solo && crR() < 0.6 ? 'soar' : FLIGHT_PATHS[(crR() * FLIGHT_PATHS.length) | 0];
-  f.amp = H * (0.02 + crR() * 0.06); f.freq = 0.3 + crR() * 0.9;
-  f.vamp = 0.05 + crR() * 0.3; f.vfreq = 0.2 + crR() * 0.8;
+  f.amp = H * (0.008 + crR() * 0.02); f.freq = 0.15 + crR() * 0.25;          // légère ondulation de l'altitude, lente
+  f.vamp = 0.02 + crR() * 0.04; f.vfreq = 0.1 + crR() * 0.2;                // vitesse quasi constante
+  f.rate = 6 + crR() * 1.5;                                                  // cadence de battement commune à toute la volée
   f.age = 0; f.pathT0 = 0; f.mirror = dir; f.mode = 'path'; f.theta = dir > 0 ? 0 : Math.PI; f.vx = dir * f.v; f.vy = 0; f.cy = f.y;
   const near = islands.filter(i => i.haze < 0.35);
   if (f.path === 'orbit' && near.length) {                             // ronde autour d'une île, puis départ
@@ -2282,9 +2262,7 @@ function spawnFlock(f, onScreen) {
 const DRAGON_MANEUVERS = { dive: 5.5, climb: 5, weave: 8, hover: 4.5, uturn: 6 };
 function spawnDragon() {
   const dir = crR() < 0.5 ? -1 : 1, sc = U * 0.0016, y0 = (0.14 + crR() * 0.2) * H;
-  const kinds = Object.keys(DRAGON_MANEUVERS).sort(() => crR() - 0.5).slice(0, 2 + (crR() < 0.4 ? 1 : 0));
-  let t = 3 + crR() * 4;
-  const plan = kinds.map(kind => { const m = { kind, t0: t, du: DRAGON_MANEUVERS[kind] }; t += m.du + 3 + crR() * 5; return m; });
+  const plan = [];                                                     // plus de manœuvres brusques : vol de croisière régulier
   dragon = { active: true, dir, face: dir, sc, x: dir > 0 ? -sc * 90 : W + sc * 90, y0, cy: y0, vx: 0, vy: 0, tilt: 0,
              v: W / (45 + crR() * 25), ph: crR() * 6.28, wait: 0, age: 0, plan, rate: 1.7, amp: 1, fold: 0, wph: 0,
              fireAt: T + 3 + crR() * 4, fireT0: -99 };
@@ -2321,34 +2299,19 @@ function updateCreatures(dt) {
   const d = dragon;
   if (d.active) {
     d.age += dt;
-    let speedMul = 1 + 0.12 * Math.sin(d.age * 0.7 + d.ph), dy = Math.sin(d.age * 0.5 + d.ph) * H * 0.03, rate = 1.7, amp = 1, fold = 0;
-    for (const m of d.plan) {
-      const p = (d.age - m.t0) / m.du;
-      if (p <= 0 || p >= 1) continue;
-      const b = Math.sin(Math.PI * p);
-      switch (m.kind) {
-        case 'dive':  dy += H * 0.17 * b; speedMul *= 1 + 0.45 * b; amp = 0.15; fold = b; rate = 1.2; break;      // piqué : ailes repliées
-        case 'climb': dy -= H * 0.12 * b; rate = 2.6; amp = 1.25; break;                                           // ascension à grands coups d'ailes
-        case 'weave': dy += H * 0.06 * Math.sin(p * Math.PI * 4); rate = 2.0; break;                               // slalom
-        case 'hover':                                                                                              // vol stationnaire : il crache du feu
-          speedMul *= 0.1 + 0.9 * (1 - b); rate = 3.2; amp = 1.3;
-          if (!m.fired) { m.fired = true; d.fireT0 = T; d.fireAt = T + 7 + crR() * 5; }
-          break;
-        case 'uturn': speedMul *= Math.cos(Math.PI * p); dy -= H * 0.04 * b; rate = 2.2; amp = 1.15; break;        // demi-tour
-      }
-    }
+    // Vol naturel : croisière à vitesse constante, altitude qui ondule lentement, battements d'ailes par séries puis plané
+    const dy = Math.sin(d.age * 0.28 + d.ph) * H * 0.035 + Math.sin(d.age * 0.11 + d.ph * 2) * H * 0.015;
+    const flapGate = smooth(clamp(0.5 + 1.3 * Math.sin(d.age * 0.55 + d.ph), 0, 1));       // 1 = bat des ailes, 0 = plane
     const k1 = 1 - Math.exp(-dt * 2);
-    d.rate += (rate - d.rate) * k1; d.amp += (amp - d.amp) * k1; d.fold += (fold - d.fold) * (1 - Math.exp(-dt * 3));
-    d.wph += dt * d.rate;                                              // phase de battement cumulée (la cadence peut varier sans à-coup)
-    const vx = d.dir * d.v * speedMul;
+    d.rate += (lerp(0.6, 2.3, flapGate) - d.rate) * k1; d.amp += (lerp(0.2, 1, flapGate) - d.amp) * k1; d.fold = 0;
+    d.wph += dt * d.rate;                                              // phase de battement cumulée (la cadence varie sans à-coup)
+    const vx = d.dir * d.v;
     d.x += vx * dt;
     const ny = d.y0 + dy;
-    d.vy = (ny - d.cy) / Math.max(dt, 1e-3); d.cy = ny; d.vx = vx;
-    if (Math.abs(vx) > d.v * 0.08) d.face = vx >= 0 ? 1 : -1;
-    const want = clamp(Math.atan2(-d.vy, Math.max(Math.abs(vx), d.v * 0.3)), -0.5, 0.5);                           // cabré en montée, piqué en descente
-    d.tilt += (want - d.tilt) * (1 - Math.exp(-dt * 3));
-    // Souffle de feu toutes les 6 à 13 s, seulement quand le dragon est bien à l'écran
-    if (T >= d.fireAt && d.x > W * 0.08 && d.x < W * 0.92) { d.fireT0 = T; d.fireAt = T + 6 + crR() * 7; }
+    d.vy = (ny - d.cy) / Math.max(dt, 1e-3); d.cy = ny; d.vx = vx; d.face = d.dir;
+    d.tilt += (clamp(Math.atan2(-d.vy, Math.abs(vx)), -0.25, 0.25) - d.tilt) * (1 - Math.exp(-dt * 2));   // légère inclinaison en montée / descente
+    // Souffle de feu toutes les 14 à 24 s, seulement quand le dragon est bien à l'écran
+    if (T >= d.fireAt && d.x > W * 0.08 && d.x < W * 0.92) { d.fireT0 = T; d.fireAt = T + 14 + crR() * 10; }
     if (d.age > 2 && (d.x < -d.sc * 100 || d.x > W + d.sc * 100)) { d.active = false; d.wait = 40 + crR() * 50; }
   } else if ((d.wait -= dt) <= 0) spawnDragon();
   for (const j of jellies) { j.x += j.v * dt; if (j.x > W + 80) j.x = -80; else if (j.x < -80) j.x = W + 80; }
@@ -2363,17 +2326,17 @@ function drawBirds(sky) {
     ctx.globalAlpha = clamp(f.age / 1.5, 0, 1);                        // apparition en fondu (surtout pour les rondes)
     ctx.lineWidth = Math.max(1, f.w * 0.26);
     ctx.beginPath();
-    const m = smooth(0.5 + 0.5 * Math.sin(T * f.mr + f.ph));          // 0 = formation A, 1 = formation B
+    const m = 0;                                                       // formation stable (les oiseaux gardent leur place)
+    const flockGate = smooth(clamp(0.5 - f.glideBias * 0.5 + 1.2 * Math.sin(T * 0.3 + f.ph), 0, 1));   // toute la volée bat des ailes puis plane ensemble
     const ct = Math.cos(f.theta), st = Math.sin(f.theta);
     const pitch = Math.atan2(f.vy, Math.abs(f.vx)) * (f.vx >= 0 ? 1 : -1) * 0.7, cp = Math.cos(pitch), sp = Math.sin(pitch);   // tangage selon la pente
     for (const b of f.birds) {
       const w = f.w * b.s;
       // position dans le repère de la volée (derrière le meneur), tournée selon le cap
-      const lx = -lerp(b.ax, b.bx, m) + Math.sin(T * 0.6 + b.jx) * w * 0.6, ly = lerp(b.ay, b.by, m) * f.mirror + Math.sin(T * 0.8 + b.jy) * w * 0.5;
+      const lx = -lerp(b.ax, b.bx, m) + Math.sin(T * 0.6 + b.jx) * w * 0.15, ly = lerp(b.ay, b.by, m) * f.mirror + Math.sin(T * 0.8 + b.jy) * w * 0.12;
       const bx = f.x + lx * ct - ly * st, by = f.cy + lx * st + ly * ct;
       // alterne battements d'ailes et vol plané, chacun à son rythme
-      const gate = smooth(clamp(0.5 - f.glideBias * 0.5 + 1.2 * Math.sin(T * 0.35 + b.glide), 0, 1));
-      const fl = lerp(0.25, Math.sin(T * b.rate * f.flapScale + b.ph), gate);
+      const fl = lerp(0.25, Math.sin(T * f.rate * f.flapScale + b.ph * 0.12 + (b.ax / f.w) * 0.15), flockGate);
       const P = (x, y) => [bx + x * cp - y * sp, by + x * sp + y * cp];
       let q = P(-w, -fl * w * 0.55); ctx.moveTo(q[0], q[1]);
       q = P(-w * 0.45, -fl * w * 0.85 - w * 0.3); const q2 = P(0, 0); ctx.quadraticCurveTo(q[0], q[1], q2[0], q2[1]);
@@ -2965,9 +2928,6 @@ function frame(ms) {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = `400 ${Math.round(big * 0.34)}px "Segoe UI", system-ui, sans-serif`;
     ctx.fillText(dateText, x, y + big * 1.05);
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';                       // numéro de version : permet de vérifier la version chargée
-    ctx.font = `400 ${Math.round(big * 0.2)}px "Segoe UI", system-ui, sans-serif`;
-    ctx.fillText(BUILD, x, y + big * 1.5);
     ctx.shadowBlur = 0; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 
