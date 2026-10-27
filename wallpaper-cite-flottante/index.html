@@ -29,7 +29,7 @@
 (() => {
 'use strict';
 
-const BUILD = 'v2.2';
+const BUILD = 'v2.4';
 const QS = new URLSearchParams(location.search);   // paramètres de test : ?dragon et ?monster font apparaître les créatures tout de suite   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
@@ -723,14 +723,14 @@ function buildIslands() {
     // (c'est là que s'accrochent les ponts suspendus)
     for (const sd of [-1, 1]) {
       const px = sd * 44, py = hill(px);
-      structs.rect(px - 0.6, py - 14, 1.2, 15);                                   // pylône
-      structs.rect(px - 1.4, py - 14.7, 2.8, 0.9);                                // chapeau du pylône
-      structs.rect(px - 1.0, py - 8.5, 2.0, 0.5);                                 // traverse
+      structs.rect(px - 0.85, py - 15.4, 1.7, 16.4);                              // pylône (large pour bien se lire)
+      structs.rect(px - 1.9, py - 16.3, 3.8, 1.1);                                // chapeau du pylône
+      structs.rect(px - 1.4, py - 9, 2.8, 0.7);                                   // traverse
       structs.rect(sd > 0 ? px : px - 7.4, py - 0.9, 7.4, 1.0);                   // quai
       structs.moveTo(px + sd * 3, py + 0.1); structs.lineTo(px + sd * 7, py + 0.1); structs.lineTo(px + sd * 3, py + 4); structs.closePath();   // contrefiche
       const bx = px - sd * 10, by = hill(bx);                                     // hauban vers l'intérieur de l'île
-      structs.moveTo(px, py - 14); structs.lineTo(px, py - 13.4); structs.lineTo(bx, by - 0.2); structs.lineTo(bx, by - 0.8); structs.closePath();
-      addLamp(px, py - 15.4);
+      structs.moveTo(px, py - 15.4); structs.lineTo(px, py - 14.6); structs.lineTo(bx, by - 0.1); structs.lineTo(bx, by - 0.9); structs.closePath();
+      addLamp(px, py - 17.4);
     }
 
     // Habitants : villageois, gardes, magiciens, fermiers, marchands, enfants, moines, chiens et moutons selon le thème
@@ -745,11 +745,11 @@ function buildIslands() {
     });
     // Cascade qui tombe du bord de l'île
     // Cascades : une par-dessus le bord (selon l'île), plus des chutes qui jaillissent du flanc du rocher
-    const falls = d.fall ? [{ x: d.fall * 47.5, y: hill(d.fall * 47.5) + 0.5, side: d.fall, len: 45 + r() * 30, w: 0.9 }] : [];
+    const falls = d.fall ? [{ x: d.fall * 47.5, y: hill(d.fall * 47.5) + 0.5, side: d.fall, len: 42 + r() * 26, w: 1.0 }] : [];
     const extra = d.size >= 0.2 ? 1 : d.size >= 0.1 ? (r() < 0.5 ? 1 : 0) : 0;     // peu de cascades : une sur l'île principale, parfois une sur une île moyenne
     for (let k = 0; k < extra; k++) {
       const u = k % 2 ? under[14 - ((r() * 3) | 0)] : under[1 + ((r() * 3) | 0)];     // flanc du rocher, partie haute
-      falls.push({ x: u.x, y: u.y, side: u.x < 0 ? -1 : 1, len: 50 + r() * 30, w: 1.0 + r() * 0.4 });
+      falls.push({ x: u.x, y: u.y, side: u.x < 0 ? -1 : 1, len: 46 + r() * 22, w: 1.1 + r() * 0.3 });
     }
 
     return {
@@ -782,32 +782,34 @@ function anchor(isl, lx, ly) {
 }
 
 // Pont suspendu : quais et pylônes sur chaque île (voir buildIslands), câble principal en arc entre les sommets des pylônes,
-// tablier presque plat posé sur les quais et suspentes verticales qui relient le câble au tablier
+// tablier presque plat posé sur les quais et suspentes verticales. Trait épais, tablier sombre avec liseré clair et treillis dessous.
 function drawBridge(br, sky) {
   const A = br.A, B = br.B;
   const [x0, y0] = anchor(A, 51.4, A.pierR - 0.7), [x1, y1] = anchor(B, -51.4, B.pierL - 0.7);      // bouts des quais
-  const [t0x, t0y] = anchor(A, 44, A.pierR - 14), [t1x, t1y] = anchor(B, -44, B.pierL - 14);        // sommets des pylônes
+  const [t0x, t0y] = anchor(A, 44, A.pierR - 15.4), [t1x, t1y] = anchor(B, -44, B.pierL - 15.4);    // sommets des pylônes
   const dist = Math.hypot(x1 - x0, y1 - y0);
   const sway = Math.sin(bridgePh + br.ph) * dist * (0.002 + windK * 0.008);                         // léger balancement au vent
-  // tablier : creux très faible, il arrive donc presque horizontalement sur les quais
-  const dcx = (x0 + x1) / 2, dcy = (y0 + y1) / 2 + dist * 0.05 + sway;
+  const dcx = (x0 + x1) / 2, dcy = (y0 + y1) / 2 + dist * 0.05 + sway;                              // tablier : creux très faible
   const dpt = t => [(1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * dcx + t * t * x1, (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * dcy + t * t * y1];
-  // câble : son creux est calculé pour passer juste au-dessus du milieu du tablier
-  const hp = (y0 + y1) / 2 - (t0y + t1y) / 2, clear = Math.max(U * 0.004, hp * 0.2);
+  const hp = (y0 + y1) / 2 - (t0y + t1y) / 2, clear = Math.max(U * 0.005, hp * 0.2);                // câble : passe juste au-dessus du tablier
   const ccx = (t0x + t1x) / 2, ccy = (t0y + t1y) / 2 + 2 * (hp + dist * 0.025 - clear) + sway * 0.5;
   const cpt = t => [(1 - t) * (1 - t) * t0x + 2 * (1 - t) * t * ccx + t * t * t1x, (1 - t) * (1 - t) * t0y + 2 * (1 - t) * t * ccy + t * t * t1y];
 
-  const col = mix(sky.sil, sky.hor, (A.haze + B.haze) / 2);
-  const lw = Math.max(0.8, U * 0.0012), rail = U * 0.006;
-  ctx.strokeStyle = rgb(col); ctx.lineCap = 'round';
-  ctx.lineWidth = lw * 2.6;                                              // tablier
-  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(dcx, dcy, x1, y1); ctx.stroke();
-  ctx.lineWidth = lw * 0.9;                                              // garde-corps
-  ctx.beginPath(); ctx.moveTo(x0, y0 - rail); ctx.quadraticCurveTo(dcx, dcy - rail, x1, y1 - rail); ctx.stroke();
-  ctx.lineWidth = lw * 1.3;                                              // câble principal
+  const dayK = clamp(1 - sky.star, 0, 1), col = mix(sky.sil, sky.hor, (A.haze + B.haze) / 2);
+  const dark = mix(col, sky.sil, 0.45), cable = mix(col, sky.sil, 0.2), hi = mix(col, [255, 255, 255], 0.2 + 0.25 * dayK);
+  const lw = Math.max(1.3, U * 0.002), rail = U * 0.0075, off = lw * 2.7;
+  const curve = (dy, extraX) => { ctx.beginPath(); ctx.moveTo(x0, y0 + dy); ctx.quadraticCurveTo(dcx, dcy + dy, x1, y1 + dy); };
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = rgb(dark, 0.9); ctx.lineWidth = lw * 1.2;                                        // treillis sous le tablier
+  ctx.setLineDash([lw * 2.2, lw * 1.8]); curve(off * 0.85); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = rgb(dark); ctx.lineWidth = lw * 3.4; curve(0); ctx.stroke();                     // tablier
+  ctx.strokeStyle = rgb(hi, 0.75); ctx.lineWidth = lw * 0.9; curve(-lw * 1.2); ctx.stroke();         // liseré clair sur le dessus
+  ctx.strokeStyle = rgb(cable); ctx.lineWidth = lw * 1.1; curve(-rail); ctx.stroke();                // garde-corps
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgb(cable); ctx.lineWidth = lw * 2.1;                                            // câble principal
   ctx.beginPath(); ctx.moveTo(t0x, t0y); ctx.quadraticCurveTo(ccx, ccy, t1x, t1y); ctx.stroke();
-  ctx.lineWidth = lw * 0.6;                                              // suspentes verticales, plus courtes au milieu
-  const n = Math.max(6, Math.round(dist / 15));
+  ctx.lineWidth = lw * 0.9;                                                                          // suspentes verticales
+  const n = Math.max(6, Math.round(dist / 12));
   ctx.beginPath();
   for (let i = 1; i < n; i++) {
     const c = cpt(i / n), td = (c[0] - x0) / (x1 - x0);
@@ -823,11 +825,11 @@ function drawBridge(br, sky) {
   });
   // Passants : personnages variés qui traversent le pont d'une île à l'autre (lanterne en main la nuit)
   const u = U * 0.0026, dim = 1 - (A.haze + B.haze) * 0.25, base = mix(col, sky.hor, 0.1);
-  const tintK = 0.55 * clamp(1 - sky.star, 0, 1) * dim, nightK = clamp(lamp, 0, 1) * dim;
+  const tintK = 0.55 * dayK * dim, nightK = clamp(lamp, 0, 1) * dim;
   for (const w of br.walkers) {
     const p = dpt(w.t), hop = w.pause > 0 ? 0 : Math.abs(Math.sin(T * 5 + w.t * 40)) * u * 0.12;
     ctx.save();
-    ctx.translate(p[0], p[1] - lw * 1.4 - hop);
+    ctx.translate(p[0], p[1] - lw * 1.9 - hop);
     const k = u * 0.78 * (w.sc / 1.35);
     ctx.scale(w.dir * k, k);
     drawBeing(w, base, tintK, nightK);
@@ -1055,6 +1057,7 @@ function drawFrame(sky, hour) {
   /* --- Îles flottantes --- */
   for (const isl of islands) drawIsland(isl, sky);
   for (const br of bridges) drawBridge(br, sky);
+  drawMist(sky);                                                // brume légère qui passe devant les îles
 
   /* --- Rive proche --- */
   ctx.fillStyle = mtnFill(mountains[2]);
@@ -1347,26 +1350,42 @@ for (let k = 0; k < 4; k++) {
   poly([[2.2, 0.3], [8.4, 0.3], [8.4, 2.5], [2.2, 2.1]]); BLADES.closePath();         // toile
 }
 
-// Cascade : filet d'eau qui tombe du bord de l'île et s'efface dans la brume
+// Cascade : nappe d'eau qui jaillit de derrière le rebord du rocher, s'affine puis s'évase en tombant, avec des filets
+// brillants qui dévalent, de l'écume à la source et des nuages d'embruns à l'arrivée
 function drawFalls(isl, sky) {
   if (!isl.falls.length) return;
-  const w = mix(sky.hor, [255, 255, 255], 0.6), ga = ctx.globalAlpha * (0.5 + 0.5 * clamp(1 - sky.star, 0, 1));   // plus discrètes la nuit
+  const w = mix(sky.hor, [255, 255, 255], 0.65), ga = ctx.globalAlpha * (0.55 + 0.45 * clamp(1 - sky.star, 0, 1));
+  const N = 14;
   for (const f of isl.falls) {
-    const L = f.len, k = f.w, ex = f.x + f.side * 2 + windK * 9;
-    const g = ctx.createLinearGradient(0, f.y, 0, f.y + L);
-    g.addColorStop(0, rgb(w, 0.85)); g.addColorStop(0.7, rgb(w, 0.4)); g.addColorStop(1, rgb(w, 0));
-    ctx.strokeStyle = g; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.quadraticCurveTo(f.x + f.side * 1.2, f.y + L * 0.45, ex, f.y + L);
-    ctx.lineWidth = 3.4 * k; ctx.globalAlpha = ga * 0.5; ctx.stroke();                       // voile d'eau
-    ctx.globalAlpha = ga;
-    // trois séries de filets qui dévalent à des rythmes différents
-    for (const [lw, dash, gap, sp] of [[1.3, 6, 4, 22], [0.8, 3.5, 6, 34], [0.6, 9, 7, 15]]) {
-      ctx.lineWidth = lw * k; ctx.setLineDash([dash, gap]); ctx.lineDashOffset = -T * sp - f.x * 3; ctx.stroke();
+    const k = f.w, L = f.len, sx = f.x - f.side * 2.4, sy = f.y - 0.9;          // la source est cachée derrière le rocher
+    const cx = t => sx + f.side * (2.2 * t) + windK * 7 * t * t + Math.sin(T * 1.3 + t * 6 + f.x) * 0.45 * t;
+    const wd = t => k * (2.8 - 3.2 * t + 5.4 * t * t);                           // largeur : large, fine, puis évasée
+    // nappe : polygone dont la largeur varie, dégradé qui s'efface vers le bas
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) { const t = i / N; ctx.lineTo(cx(t) - wd(t) / 2, sy + t * L); }
+    for (let i = N; i >= 0; i--) { const t = i / N; ctx.lineTo(cx(t) + wd(t) / 2, sy + t * L); }
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, sy, 0, sy + L);
+    g.addColorStop(0, rgb(w, 0.85)); g.addColorStop(0.55, rgb(w, 0.5)); g.addColorStop(1, rgb(w, 0));
+    ctx.globalAlpha = ga; ctx.fillStyle = g; ctx.fill();
+    // filets brillants qui coulent à des vitesses différentes à l'intérieur de la nappe
+    ctx.lineCap = 'round';
+    for (let j = 0; j < 4; j++) {
+      const off = (j - 1.5) * 0.3;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const t = i / N; ctx.lineTo(cx(t) + off * wd(t), sy + t * L); }
+      ctx.strokeStyle = rgb([255, 255, 255], 0.75); ctx.lineWidth = 0.42 * k;
+      ctx.setLineDash([3.5 + j, 3 + j * 0.8]); ctx.lineDashOffset = -T * (22 + j * 7) - f.x * 3;
+      ctx.globalAlpha = ga * 0.8; ctx.stroke();
     }
     ctx.setLineDash([]); ctx.lineCap = 'butt';
-    // embruns à la source et brume à l'arrivée
-    ctx.drawImage(GLOW_MIST, f.x - 4.5 * k, f.y - 4.5 * k, 9 * k, 9 * k);
-    ctx.globalAlpha = ga * 0.35; ctx.drawImage(GLOW_MIST, ex - 10 * k, f.y + L - 8 * k, 20 * k, 16 * k);
+    // écume au rebord et nuages d'embruns au pied
+    ctx.globalAlpha = ga * 0.85; ctx.drawImage(GLOW_MIST, sx - 3.2 * k, sy - 2.2 * k, 6.4 * k, 4.4 * k);
+    for (let i = 0; i < 3; i++) {
+      const dx = Math.sin(T * 0.7 + i * 2.1 + f.x) * 2.2 * k, sz = (13 + i * 5) * k;
+      ctx.globalAlpha = ga * (0.34 - i * 0.07);
+      ctx.drawImage(GLOW_MIST, cx(1) + dx - sz / 2, sy + L - i * 2.2 * k - sz * 0.35, sz, sz * 0.7);
+    }
     ctx.globalAlpha = ga;
   }
 }
@@ -2027,30 +2046,51 @@ function drawBoats(sky) {
    Monstre marin : un serpent de lac sort parfois de l'eau (cou, tête, bosses du dos),
    puis replonge dans les remous. Il revient toutes les 35 à 80 secondes.
    -------------------------------------------------------------------------- */
-let monster = { active: false, wait: QS.has('monster') ? 0.2 : 14 };
+let monster = { active: false, wait: QS.has('monster') ? 0.2 : 75 };   // rare : toutes les 2 à 5 minutes environ
+const MONSTER_ACTS = ['roar', 'tailslap', 'lunge', 'spout'];
+// Chaque apparition dure 24 à 32 s : il émerge, nage en travers du lac, enchaîne trois comportements tirés au sort
+// (rugissement, claque de queue, bond en avant, jet d'eau) puis plonge en arche
 function spawnMonster() {
-  const f = 0.3 + crR() * 0.55;                                       // profondeur sur le lac
-  monster = { active: true, t0: T, dur: 9 + crR() * 3, dir: crR() < 0.5 ? -1 : 1, x: (0.15 + crR() * 0.7) * W,
-              y: HZ + (H - HZ) * (0.18 + f * 0.65), sc: U * (0.0014 + 0.0017 * f), ph: crR() * 6.28, wait: 0 };
+  const f = 0.3 + crR() * 0.5, dir = crR() < 0.5 ? -1 : 1, travel = W * (0.12 + crR() * 0.12);
+  const acts = MONSTER_ACTS.slice().sort(() => crR() - 0.5).slice(0, 3);
+  monster = { active: true, t0: T, dur: 24 + crR() * 8, dir, travel,
+              x: clamp((0.2 + crR() * 0.6) * W, W * 0.15 + (dir < 0 ? travel : 0), W * 0.85 - (dir > 0 ? travel : 0)),
+              y: HZ + (H - HZ) * (0.18 + f * 0.62), sc: U * (0.0014 + 0.0017 * f), ph: crR() * 6.28, wait: 0,
+              events: acts.map((kind, i) => ({ kind, u0: 0.2 + i * 0.22 + crR() * 0.04, du: 0.075 })) };
 }
 function updateMonster(dt) {
-  if (monster.active) { if (T - monster.t0 > monster.dur) { monster.active = false; monster.wait = 35 + crR() * 45; } }
+  if (monster.active) { if (T - monster.t0 > monster.dur) { monster.active = false; monster.wait = 140 + crR() * 160; } }
   else if ((monster.wait -= dt) <= 0) spawnMonster();
 }
 function drawMonster(sky) {
   const m = monster;
   if (!m.active) return;
   const u = (T - m.t0) / m.dur;
-  const env = smooth(Math.min(1, u / 0.22)) * smooth(Math.min(1, (1 - u) / 0.22));   // sort puis replonge
-  if (env < 0.01) return;
-  const sc = m.sc, dir = m.dir, wy = m.y, x0 = m.x;
+  const up = smooth(clamp(u / 0.1, 0, 1)), dive = smooth(clamp((u - 0.88) / 0.12, 0, 1));   // sortie de l'eau, puis plongeon
+  if (up < 0.01 || u > 1) return;
+  // intensité de chaque comportement (0 à 1) et avancement de l'éclaboussure après la claque de queue
+  const ev = { roar: 0, tailslap: 0, lunge: 0, spout: 0 };
+  let splash = -1;
+  for (const e of m.events) {
+    ev[e.kind] = Math.sin(Math.PI * clamp((u - e.u0) / e.du, 0, 1));
+    if (e.kind === 'tailslap') { const ps = (u - (e.u0 + e.du * 0.5)) / 0.1; if (ps > 0 && ps < 1) splash = ps; }
+  }
+  const sc = m.sc, dir = m.dir, wy = m.y, env = up * (1 - dive * 0.1);
+  const xc = m.x + dir * m.travel * smooth(clamp(u, 0, 1));                      // il nage lentement en travers du lac
   const dayK = clamp(1 - sky.star, 0, 1);
   const col = mix(mix(sky.sil, [30, 72, 82], 0.3), sky.hor, 0.08 * dayK);
-  const sway = Math.sin(T * 0.9 + m.ph) * sc * 2;
-  // cou : courbe de Bézier du point d'immersion jusqu'à la tête
-  const Hn = 24 * sc * env, hx = x0 + dir * 9 * sc * (0.5 + 0.5 * env) + sway, hy = wy - Hn;
-  const cx = x0 - dir * 6 * sc, cy = wy - Hn * 0.7;
-  const nb = t => [(1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * hx, (1 - t) * (1 - t) * wy + 2 * (1 - t) * t * cy + t * t * hy];
+  const sway = Math.sin(T * 0.9 + m.ph) * sc * 2 * (1 - ev.lunge);
+  // cou : se dresse, se jette en avant (bond) ou plonge vers l'avant (fin)
+  const Hn = (24 * sc * up - ev.lunge * 7 * sc) * (1 - 0.93 * dive);
+  const hx = xc + dir * (9 * (0.5 + 0.5 * up) + 17 * ev.lunge + 20 * dive) * sc + sway, hy = wy - Hn;
+  const cx = xc - dir * (6 - 4 * ev.lunge) * sc, cy = wy - Hn * 0.7;
+  const nb = t => [(1 - t) * (1 - t) * xc + 2 * (1 - t) * t * cx + t * t * hx, (1 - t) * (1 - t) * wy + 2 * (1 - t) * t * cy + t * t * hy];
+  const headRot = 0.2 + 0.07 * Math.sin(T * 0.8 + m.ph) - ev.roar * 0.55 + dive * 0.85 + ev.lunge * 0.25;   // tête renversée quand il rugit
+  const mouth = sc * (0.55 * (0.5 + 0.5 * Math.sin(T * 1.7 + m.ph)) + ev.roar * 2.1);                      // gueule grande ouverte
+  // queue : se redresse et frappe l'eau
+  const tb = [xc - dir * 28 * sc, wy], tc = [xc - dir * 34 * sc, wy - 8 * sc * (up + ev.tailslap * 2)];
+  const tt = [xc - dir * 38 * sc, wy - (6 * up + 24 * ev.tailslap) * sc];
+  const tpt = t => [(1 - t) * (1 - t) * tb[0] + 2 * (1 - t) * t * tc[0] + t * t * tt[0], (1 - t) * (1 - t) * tb[1] + 2 * (1 - t) * t * tc[1] + t * t * tt[1]];
 
   const body = () => {
     ctx.fillStyle = rgb(col); ctx.strokeStyle = rgb(col); ctx.lineCap = 'round';
@@ -2059,15 +2099,29 @@ function drawMonster(sky) {
       ctx.lineWidth = sc * (5.4 - 3.1 * i / 16);
       ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
     }
-    ctx.lineCap = 'butt';
-    ctx.beginPath(); ctx.ellipse(hx + dir * sc * 0.6, hy, sc * 3, sc * 1.9, dir * 0.25, 0, 6.2832); ctx.fill();            // tête
-    ctx.beginPath(); ctx.ellipse(hx + dir * sc * 3, hy + sc * 0.6, sc * 2.1, sc * 1.2, dir * 0.15, 0, 6.2832); ctx.fill(); // museau
-    ctx.beginPath(); ctx.moveTo(hx - dir * sc * 1, hy - sc * 1.5); ctx.lineTo(hx - dir * sc * 3.2, hy - sc * 4); ctx.lineTo(hx - dir * sc * 2.2, hy - sc * 0.8); ctx.fill();   // crête
-    for (let k = 0; k < 3; k++) {                                     // bosses du dos
-      const hh = sc * (5.6 - k * 1.2) * env * (0.7 + 0.3 * Math.sin(T * 1.2 + k + m.ph));
-      ctx.beginPath(); ctx.ellipse(x0 - dir * (k * 9 + 9) * sc, wy, sc * 3.8, hh, 0, Math.PI, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 8; i++) {                                     // queue effilée
+      const a = tpt(i / 8), b = tpt((i + 1) / 8);
+      ctx.lineWidth = sc * (3.4 - 2.5 * i / 8);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
     }
-    ctx.beginPath(); ctx.moveTo(x0 - dir * 32 * sc, wy + sc); ctx.lineTo(x0 - dir * 36 * sc, wy - 6 * sc * env); ctx.lineTo(x0 - dir * 38 * sc, wy + sc); ctx.fill();   // nageoire de queue
+    ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(tt[0], tt[1]); ctx.lineTo(tt[0] - dir * sc * 3, tt[1] - sc * 2.6); ctx.lineTo(tt[0] + dir * sc * 2.4, tt[1] - sc * 3.2); ctx.fill();   // nageoire
+    for (let i = 3; i <= 14; i += 2) {                                // épines le long de la nuque
+      const a1 = nb(i / 16), b1 = nb((i + 1.2) / 16);
+      ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(a1[0] - dir * sc * 2.2, a1[1] - sc * 1.3); ctx.fill();
+    }
+    ctx.save();                                                       // tête : crâne, museau, mâchoire, cornes, collerette
+    ctx.translate(hx, hy); ctx.scale(dir, 1); ctx.rotate(headRot);
+    ctx.beginPath(); ctx.ellipse(sc * 0.4, 0, sc * 3.1, sc * 1.7, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sc * 3.5, sc * 0.35, sc * 2.4, sc * 1.0, 0.08, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(sc * 3.2, sc * 1.35 + mouth, sc * 2.0, sc * 0.5, 0.18 + mouth / (sc * 6), 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-sc * 1.0, -sc * 1.4); ctx.lineTo(-sc * 3.6, -sc * 3.4); ctx.lineTo(-sc * 0.1, -sc * 1.7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-sc * 1.5, -sc * 0.6); ctx.lineTo(-sc * 4.4, -sc * 1.2); ctx.lineTo(-sc * 3.6, sc * 0.6); ctx.lineTo(-sc * 1.6, sc * 1.0); ctx.fill();
+    ctx.restore();
+    for (let k = 0; k < 3; k++) {                                     // bosses du dos qui ondulent, elles se cambrent au plongeon
+      const hh = sc * (5.6 - k * 1.2) * up * (1 + 0.5 * Math.sin(Math.PI * dive)) * (1 - dive * 0.85) * (0.55 + 0.45 * Math.sin(T * 1.6 - k * 1.3 + m.ph));
+      ctx.beginPath(); ctx.ellipse(xc - dir * (k * 9 + 9) * sc, wy, sc * 3.8, hh, 0, Math.PI, Math.PI * 2); ctx.fill();
+    }
   };
   ctx.save();                                                         // au-dessus de l'eau seulement
   ctx.beginPath(); ctx.rect(0, 0, W, wy + sc * 0.8); ctx.clip();
@@ -2079,28 +2133,54 @@ function drawMonster(sky) {
   body();
   ctx.restore();
 
-  // Remous : anneaux d'écume autour du point d'immersion, gouttes qui retombent de la tête
   const foam = mix(sky.hor, [255, 255, 255], 0.5);
+  // Sillage : deux traînées d'écume derrière le corps pendant qu'il nage + anneaux autour du point d'immersion
+  const g = ctx.createLinearGradient(xc, 0, xc - dir * 60 * sc, 0);
+  g.addColorStop(0, rgb(foam, 0.45 * up)); g.addColorStop(1, rgb(foam, 0));
+  ctx.strokeStyle = g; ctx.lineWidth = Math.max(1, sc * 0.55);
+  ctx.beginPath();
+  ctx.moveTo(xc, wy + sc * 0.6); ctx.lineTo(xc - dir * 60 * sc, wy + sc * 0.6 - 7 * sc);
+  ctx.moveTo(xc, wy + sc * 0.6); ctx.lineTo(xc - dir * 60 * sc, wy + sc * 0.6 + 7 * sc);
+  ctx.stroke();
   ctx.lineWidth = Math.max(1, sc * 0.5);
   for (let i = 0; i < 3; i++) {
     const p = (T * 0.45 + i / 3) % 1;
-    ctx.strokeStyle = rgb(foam, (1 - p) * 0.5 * env);
-    ctx.beginPath(); ctx.ellipse(x0, wy + sc * 0.6, sc * (6 + p * 16), sc * (1.5 + p * 3.6), 0, 0, 6.2832); ctx.stroke();
+    ctx.strokeStyle = rgb(foam, (1 - p) * 0.5 * up);
+    ctx.beginPath(); ctx.ellipse(xc, wy + sc * 0.6, sc * (6 + p * 16), sc * (1.5 + p * 3.6), 0, 0, 6.2832); ctx.stroke();
   }
-  ctx.fillStyle = rgb(foam, 0.7 * env);
-  for (let k = 0; k < 14; k++) {
-    const tt = (T * 1.6 + k * 0.31) % 1.4, vx = dir * ((k % 5) - 2) * sc * 3.2;
-    const px = hx + vx * tt, py = hy + (-sc * 9) * tt + 0.5 * sc * 28 * tt * tt;
-    if (py > wy) continue;
-    ctx.globalAlpha = (1 - tt / 1.4) * env;
-    ctx.beginPath(); ctx.arc(px, py, sc * 0.55, 0, 6.2832); ctx.fill();
+  const drops = (n, ox, oy, power, strength, spread) => {             // gouttes lancées depuis (ox, oy) qui retombent
+    ctx.fillStyle = rgb(foam, 0.8);
+    for (let k = 0; k < n; k++) {
+      const t2 = (T * 1.3 + k * 0.29) % 1.3, vx = ((k % 7) - 3) * sc * spread;
+      const px = ox + vx * t2, py = oy + (-sc * (power + (k % 3) * 3)) * t2 + 0.5 * sc * 30 * t2 * t2;
+      if (py > wy) continue;
+      ctx.globalAlpha = clamp((1 - t2 / 1.3) * strength, 0, 1);
+      ctx.beginPath(); ctx.arc(px, py, sc * 0.5, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  };
+  drops(16, xc, wy, 9, Math.max(1 - up, dive) * 0.9, 2.6);                                  // émergence et plongeon
+  if (splash >= 0) {                                                                         // claque de queue : grosse éclaboussure
+    ctx.lineWidth = Math.max(1, sc * 0.6);
+    ctx.strokeStyle = rgb(foam, (1 - splash) * 0.7);
+    ctx.beginPath(); ctx.ellipse(tt[0], wy + sc * 0.4, sc * (4 + splash * 20), sc * (1 + splash * 5), 0, 0, 6.2832); ctx.stroke();
+    drops(22, tt[0], wy, 14, (1 - splash) * 1.1, 3.4);
   }
-  ctx.globalAlpha = 1;
+  if (ev.spout > 0.05) drops(18, hx, hy - sc, 12, ev.spout * 1.0, 1.8);                     // jet d'eau jaillissant de la tête
+  if (ev.roar > 0.05) {                                                                      // vapeur qui s'échappe de la gueule
+    ctx.fillStyle = rgb(foam, 0.5);
+    for (let i = 0; i < 7; i++) {
+      const q = (T * 1.6 + i / 7) % 1;
+      ctx.globalAlpha = ev.roar * (1 - q) * 0.6;
+      ctx.beginPath(); ctx.arc(hx + dir * sc * (4.5 + q * 9), hy - sc * (0.5 + q * 5), sc * (0.8 + q * 2.4), 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   // Œil rougeoyant la nuit
   const night = clamp(sky.star * 1.2, 0, 1);
   if (night > 0.05) {
     ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = night * env * 0.9;
-    const s = sc * 6; ctx.drawImage(GLOW_FIRE, hx + dir * sc * 1.6 - s / 2, hy - sc * 0.3 - s / 2, s, s);
+    const s = sc * 4.5; ctx.drawImage(GLOW_FIRE, hx + dir * sc * 1.5 - s / 2, hy - sc * 0.2 - s / 2, s, s);
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   }
 }
@@ -2124,7 +2204,8 @@ const SHADOW = (() => {
   x.fillStyle = g; x.fillRect(0, 0, 64, 64);
   return c;
 })();
-const GLOW_FIRE = mkGlow(255, 140, 40), GLOW_FIRE2 = mkGlow(255, 228, 150);   // flammes du dragon, yeux du monstre
+const GLOW_FIRE = mkGlow(255, 140, 40), GLOW_FIRE2 = mkGlow(255, 228, 150);   // lueurs chaudes (montgolfières, yeux, forges)
+const FLAME_RED = mkGlow(226, 46, 22), FLAME_ORANGE = mkGlow(255, 112, 26), FLAME_CORE = mkGlow(255, 168, 52);   // flamme du dragon : rouge-orangé
 
 // Positions des oiseaux (décalage derrière le meneur) pour un type de formation
 const FORMATIONS = ['v', 'line', 'row', 'ring', 'cluster', 'swarm'];
@@ -2145,6 +2226,19 @@ function flockSlots(kind, n, w) {
 }
 // Chaque volée part d'une formation et se transforme lentement vers une autre (mélange A -> B),
 // avec sa propre taille, vitesse, altitude et nombre d'oiseaux : elles ne se ressemblent jamais
+// Trajectoires des oiseaux : ligne droite, ondulation, piqué, zigzag, vol plané, ou ronde autour d'une île
+const FLIGHT_PATHS = ['straight', 'wave', 'swoop', 'zigzag', 'soar', 'orbit'];
+// Décalage vertical (px) de la trajectoire à l'instant t depuis le début du vol
+function pathOffset(f, t) {
+  const A = f.amp;
+  switch (f.path) {
+    case 'wave':   return A * Math.sin(t * f.freq + f.ph);
+    case 'swoop':  return A * Math.pow(Math.sin(t * f.freq * 0.5 + f.ph), 3);                  // longues remontées, plongeons brefs
+    case 'zigzag': return A * 0.64 * Math.asin(Math.sin(t * f.freq + f.ph));                   // virages en dents de scie
+    case 'soar':   return A * 0.4 * Math.sin(t * f.freq * 0.4 + f.ph) + A * 0.15 * Math.sin(t * f.freq * 1.7);
+    default:       return 0;
+  }
+}
 function spawnFlock(f, onScreen) {
   const dir = crR() < 0.5 ? -1 : 1, solo = crR() < 0.2;                // 1 volée sur 5 : un ou deux grands planeurs
   f.dir = dir; f.w = U * (solo ? 0.0055 + crR() * 0.0025 : 0.002 + crR() * 0.0028);   // demi-envergure en pixels (petits oiseaux lointains)
@@ -2155,21 +2249,45 @@ function spawnFlock(f, onScreen) {
   f.kind = solo ? 'solo' : kA + '→' + kB;
   f.mr = 0.04 + crR() * 0.08;                                          // vitesse de transformation (période 50 à 150 s)
   f.v = (22 + crR() * 50) * (U / 1920); f.y = (0.07 + crR() * 0.34) * H; f.ph = crR() * 6.28;
-  f.glideBias = solo ? 1.2 : 0;                                        // les planeurs battent moins des ailes
+  // Style de battement : continu, par salves ou longs planés ; les rapaces solitaires planent surtout
+  const style = crR();
+  f.glideBias = solo ? 1.2 : style < 0.3 ? -0.8 : style < 0.7 ? 0 : 0.9;
+  f.flapScale = clamp(U * 0.0035 / f.w, 0.6, 1.4);                     // les gros oiseaux battent plus lentement
+  // Trajectoire et variations de vitesse (rafales)
+  f.path = solo && crR() < 0.6 ? 'soar' : FLIGHT_PATHS[(crR() * FLIGHT_PATHS.length) | 0];
+  f.amp = H * (0.02 + crR() * 0.06); f.freq = 0.3 + crR() * 0.9;
+  f.vamp = 0.05 + crR() * 0.3; f.vfreq = 0.2 + crR() * 0.8;
+  f.age = 0; f.pathT0 = 0; f.mirror = dir; f.mode = 'path'; f.theta = dir > 0 ? 0 : Math.PI; f.vx = dir * f.v; f.vy = 0; f.cy = f.y;
+  const near = islands.filter(i => i.haze < 0.35);
+  if (f.path === 'orbit' && near.length) {                             // ronde autour d'une île, puis départ
+    const isl = near[(crR() * near.length) | 0], rx = U * (0.05 + crR() * 0.05);
+    f.mode = 'orbit';
+    f.orbit = { cx: isl.x + (crR() - 0.5) * isl.s * 50, cy: isl.y - H * (0.06 + crR() * 0.08), rx, ry: rx * (0.35 + crR() * 0.25),
+                w: (0.35 + crR() * 0.35) * (crR() < 0.5 ? -1 : 1), a: crR() * 6.28, dur: 14 + crR() * 14 };
+    f.x = f.orbit.cx + f.orbit.rx * Math.cos(f.orbit.a); f.cy = f.orbit.cy + f.orbit.ry * Math.sin(f.orbit.a);
+  } else {
+    if (f.path === 'orbit') f.path = 'wave';
+    f.x = onScreen ? crR() * W : (dir > 0 ? -f.w * 20 : W + f.w * 20);
+  }
   const A = flockSlots(solo ? 'cluster' : kA, n, f.w), B = flockSlots(solo ? 'cluster' : kB, n, f.w);
   f.birds = A.map((a, i) => ({                                         // chaque oiseau a sa taille, sa cadence et ses dérives
     ax: a.ox, ay: a.oy, bx: B[i].ox, by: B[i].oy,
     s: 0.75 + crR() * 0.5, ph: crR() * 6.28, rate: 5 + crR() * 3.5,
     jx: crR() * 6.28, jy: crR() * 6.28, glide: crR() * 6.28
   }));
-  f.x = onScreen ? crR() * W : (dir > 0 ? -f.w * 20 : W + f.w * 20);
   f.active = true;
 }
+
+// Manœuvres du dragon : piqué, ascension, slalom, vol stationnaire (il crache alors du feu) et demi-tour
+const DRAGON_MANEUVERS = { dive: 5.5, climb: 5, weave: 8, hover: 4.5, uturn: 6 };
 function spawnDragon() {
-  const dir = crR() < 0.5 ? -1 : 1, sc = U * 0.0016;
-  dragon = { active: true, dir, sc, x: dir > 0 ? -sc * 90 : W + sc * 90, y: (0.14 + crR() * 0.2) * H,
-             v: W / (45 + crR() * 25), ph: crR() * 6.28, wait: 0, base: 0, fireAt: T + 3 + crR() * 4, fireT0: -99 };
-  dragon.base = dragon.y;
+  const dir = crR() < 0.5 ? -1 : 1, sc = U * 0.0016, y0 = (0.14 + crR() * 0.2) * H;
+  const kinds = Object.keys(DRAGON_MANEUVERS).sort(() => crR() - 0.5).slice(0, 2 + (crR() < 0.4 ? 1 : 0));
+  let t = 3 + crR() * 4;
+  const plan = kinds.map(kind => { const m = { kind, t0: t, du: DRAGON_MANEUVERS[kind] }; t += m.du + 3 + crR() * 5; return m; });
+  dragon = { active: true, dir, face: dir, sc, x: dir > 0 ? -sc * 90 : W + sc * 90, y0, cy: y0, vx: 0, vy: 0, tilt: 0,
+             v: W / (45 + crR() * 25), ph: crR() * 6.28, wait: 0, age: 0, plan, rate: 1.7, amp: 1, fold: 0, wph: 0,
+             fireAt: T + 3 + crR() * 4, fireT0: -99 };
   if (QS.has('dragon')) { dragon.x = W * (dir > 0 ? 0.25 : 0.75); dragon.fireAt = T + 1.2; }   // test : déjà à l'écran
 }
 function buildCreatures() {
@@ -2183,16 +2301,56 @@ function buildCreatures() {
 function updateCreatures(dt) {
   for (const f of flocks) {
     if (!f.active) { f.wait -= dt; if (f.wait <= 0) spawnFlock(f, false); continue; }
-    f.x += f.dir * f.v * dt * (1 + windK * 0.5);
-    if (f.x < -f.w * 25 || f.x > W + f.w * 25) { f.active = false; f.wait = 5 + crR() * 15; }
+    f.age += dt;
+    if (f.mode === 'orbit') {                                          // ronde : ellipse autour de l'île, puis envol dans la direction courante
+      const o = f.orbit;
+      o.a += o.w * dt;
+      const nx = o.cx + o.rx * Math.cos(o.a), ny = o.cy + o.ry * Math.sin(o.a);
+      f.vx = (nx - f.x) / dt; f.vy = (ny - f.cy) / dt; f.x = nx; f.cy = ny;
+      if (f.age > o.dur) { f.mode = 'path'; f.dir = f.vx >= 0 ? 1 : -1; f.mirror = f.dir; f.y = f.cy; f.pathT0 = f.age; f.path = 'wave'; }
+    } else {
+      const sp = f.v * (1 + f.vamp * Math.sin(f.age * f.vfreq + f.ph)) * (1 + windK * 0.5);          // accélère et ralentit par rafales
+      f.x += f.dir * sp * dt;
+      const ny = f.y + pathOffset(f, f.age - f.pathT0);
+      f.vy = (ny - f.cy) / dt; f.vx = f.dir * sp; f.cy = ny;
+    }
+    let da = Math.atan2(f.vy, f.vx) - f.theta; da = Math.atan2(Math.sin(da), Math.cos(da));
+    f.theta += da * (1 - Math.exp(-dt * 3));                           // cap de la volée (lissé)
+    if (f.mode === 'path' && (f.x < -f.w * 25 || f.x > W + f.w * 25)) { f.active = false; f.wait = 5 + crR() * 15; }
   }
-  if (dragon.active) {
-    dragon.x += dragon.dir * dragon.v * dt;
-    dragon.y = dragon.base + Math.sin(T * 0.5 + dragon.ph) * H * 0.03;
+  const d = dragon;
+  if (d.active) {
+    d.age += dt;
+    let speedMul = 1 + 0.12 * Math.sin(d.age * 0.7 + d.ph), dy = Math.sin(d.age * 0.5 + d.ph) * H * 0.03, rate = 1.7, amp = 1, fold = 0;
+    for (const m of d.plan) {
+      const p = (d.age - m.t0) / m.du;
+      if (p <= 0 || p >= 1) continue;
+      const b = Math.sin(Math.PI * p);
+      switch (m.kind) {
+        case 'dive':  dy += H * 0.17 * b; speedMul *= 1 + 0.45 * b; amp = 0.15; fold = b; rate = 1.2; break;      // piqué : ailes repliées
+        case 'climb': dy -= H * 0.12 * b; rate = 2.6; amp = 1.25; break;                                           // ascension à grands coups d'ailes
+        case 'weave': dy += H * 0.06 * Math.sin(p * Math.PI * 4); rate = 2.0; break;                               // slalom
+        case 'hover':                                                                                              // vol stationnaire : il crache du feu
+          speedMul *= 0.1 + 0.9 * (1 - b); rate = 3.2; amp = 1.3;
+          if (!m.fired) { m.fired = true; d.fireT0 = T; d.fireAt = T + 7 + crR() * 5; }
+          break;
+        case 'uturn': speedMul *= Math.cos(Math.PI * p); dy -= H * 0.04 * b; rate = 2.2; amp = 1.15; break;        // demi-tour
+      }
+    }
+    const k1 = 1 - Math.exp(-dt * 2);
+    d.rate += (rate - d.rate) * k1; d.amp += (amp - d.amp) * k1; d.fold += (fold - d.fold) * (1 - Math.exp(-dt * 3));
+    d.wph += dt * d.rate;                                              // phase de battement cumulée (la cadence peut varier sans à-coup)
+    const vx = d.dir * d.v * speedMul;
+    d.x += vx * dt;
+    const ny = d.y0 + dy;
+    d.vy = (ny - d.cy) / Math.max(dt, 1e-3); d.cy = ny; d.vx = vx;
+    if (Math.abs(vx) > d.v * 0.08) d.face = vx >= 0 ? 1 : -1;
+    const want = clamp(Math.atan2(-d.vy, Math.max(Math.abs(vx), d.v * 0.3)), -0.5, 0.5);                           // cabré en montée, piqué en descente
+    d.tilt += (want - d.tilt) * (1 - Math.exp(-dt * 3));
     // Souffle de feu toutes les 6 à 13 s, seulement quand le dragon est bien à l'écran
-    if (T >= dragon.fireAt && dragon.x > W * 0.08 && dragon.x < W * 0.92) { dragon.fireT0 = T; dragon.fireAt = T + 6 + crR() * 7; }
-    if (dragon.x < -dragon.sc * 100 || dragon.x > W + dragon.sc * 100) { dragon.active = false; dragon.wait = 40 + crR() * 50; }
-  } else if ((dragon.wait -= dt) <= 0) spawnDragon();
+    if (T >= d.fireAt && d.x > W * 0.08 && d.x < W * 0.92) { d.fireT0 = T; d.fireAt = T + 6 + crR() * 7; }
+    if (d.age > 2 && (d.x < -d.sc * 100 || d.x > W + d.sc * 100)) { d.active = false; d.wait = 40 + crR() * 50; }
+  } else if ((d.wait -= dt) <= 0) spawnDragon();
   for (const j of jellies) { j.x += j.v * dt; if (j.x > W + 80) j.x = -80; else if (j.x < -80) j.x = W + 80; }
 }
 function drawBirds(sky) {
@@ -2202,89 +2360,99 @@ function drawBirds(sky) {
   ctx.lineCap = 'round';
   for (const f of flocks) {
     if (!f.active) continue;
-    const cy = f.y + Math.sin(T * 0.25 + f.ph) * H * 0.025;           // le vol ondule doucement
+    ctx.globalAlpha = clamp(f.age / 1.5, 0, 1);                        // apparition en fondu (surtout pour les rondes)
     ctx.lineWidth = Math.max(1, f.w * 0.26);
     ctx.beginPath();
     const m = smooth(0.5 + 0.5 * Math.sin(T * f.mr + f.ph));          // 0 = formation A, 1 = formation B
+    const ct = Math.cos(f.theta), st = Math.sin(f.theta);
+    const pitch = Math.atan2(f.vy, Math.abs(f.vx)) * (f.vx >= 0 ? 1 : -1) * 0.7, cp = Math.cos(pitch), sp = Math.sin(pitch);   // tangage selon la pente
     for (const b of f.birds) {
       const w = f.w * b.s;
-      const bx = f.x - f.dir * lerp(b.ax, b.bx, m) + Math.sin(T * 0.6 + b.jx) * w * 0.6;   // dérive individuelle
-      const by = cy + lerp(b.ay, b.by, m) + Math.sin(T * 0.8 + b.jy) * w * 0.5;
+      // position dans le repère de la volée (derrière le meneur), tournée selon le cap
+      const lx = -lerp(b.ax, b.bx, m) + Math.sin(T * 0.6 + b.jx) * w * 0.6, ly = lerp(b.ay, b.by, m) * f.mirror + Math.sin(T * 0.8 + b.jy) * w * 0.5;
+      const bx = f.x + lx * ct - ly * st, by = f.cy + lx * st + ly * ct;
       // alterne battements d'ailes et vol plané, chacun à son rythme
       const gate = smooth(clamp(0.5 - f.glideBias * 0.5 + 1.2 * Math.sin(T * 0.35 + b.glide), 0, 1));
-      const fl = lerp(0.25, Math.sin(T * b.rate + b.ph), gate);
-      ctx.moveTo(bx - w, by - fl * w * 0.55);
-      ctx.quadraticCurveTo(bx - w * 0.45, by - fl * w * 0.85 - w * 0.3, bx, by);
-      ctx.quadraticCurveTo(bx + w * 0.45, by - fl * w * 0.85 - w * 0.3, bx + w, by - fl * w * 0.55);
+      const fl = lerp(0.25, Math.sin(T * b.rate * f.flapScale + b.ph), gate);
+      const P = (x, y) => [bx + x * cp - y * sp, by + x * sp + y * cp];
+      let q = P(-w, -fl * w * 0.55); ctx.moveTo(q[0], q[1]);
+      q = P(-w * 0.45, -fl * w * 0.85 - w * 0.3); const q2 = P(0, 0); ctx.quadraticCurveTo(q[0], q[1], q2[0], q2[1]);
+      q = P(w * 0.45, -fl * w * 0.85 - w * 0.3); const q3 = P(w, -fl * w * 0.55); ctx.quadraticCurveTo(q[0], q[1], q3[0], q3[1]);
     }
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
   ctx.lineCap = 'butt';
 }
 function drawDragon(sky) {
   const d = dragon;
   if (!d.active) return;
-  const sc = d.sc, N = 15, seg = sc * 5.2, dir = d.dir, sg = -dir;
+  const sc = d.sc, N = 15, seg = sc * 5.2;
   const col = mix(sky.sil, sky.top, 0.05), nightK = clamp(sky.star * 1.2, 0, 1);
+  ctx.save();
+  ctx.translate(d.x, d.cy); ctx.scale(d.face, 1); ctx.rotate(-d.tilt);          // repère du dragon : tête à l'origine, regarde vers +x
   const P = [];
-  for (let i = 0; i < N; i++) P.push([d.x - dir * i * seg, d.y + Math.sin(T * 2.1 - i * 0.55) * sc * 3.2 * (0.4 + i / N)]);
-  const root = P[3], up = 0.3 + 0.7 * Math.sin(T * 1.7 + d.ph);   // battement des ailes
+  for (let i = 0; i < N; i++) P.push([-i * seg, Math.sin(T * 2.1 - i * 0.55) * sc * 3.2 * (0.4 + i / N)]);
+  const root = P[3], up = 0.3 + 0.7 * d.amp * Math.sin(d.wph + d.ph) - d.fold * 0.9, reach = 1 - 0.3 * d.fold;   // battement ; ailes repliées en piqué
   const wing = (ox, oy, a) => {
     const rx = root[0] + ox, ry = root[1] + oy;
     ctx.globalAlpha = a;
     ctx.beginPath(); ctx.moveTo(rx, ry);
-    ctx.lineTo(rx + sg * 3 * sc, ry - 26 * sc * up);
-    ctx.lineTo(rx + sg * 11 * sc, ry - 10 * sc * up - 2 * sc);
-    ctx.lineTo(rx + sg * 19 * sc, ry - 19 * sc * up);
-    ctx.lineTo(rx + sg * 25 * sc, ry - 5 * sc * up);
-    ctx.lineTo(rx + sg * 15 * sc, ry + sc);
+    ctx.lineTo(rx - 3 * sc * reach, ry - 26 * sc * up * reach);
+    ctx.lineTo(rx - 11 * sc * reach, ry - 10 * sc * up * reach - 2 * sc);
+    ctx.lineTo(rx - 19 * sc * reach, ry - 19 * sc * up * reach);
+    ctx.lineTo(rx - 25 * sc * reach, ry - 5 * sc * up * reach);
+    ctx.lineTo(rx - 15 * sc * reach, ry + sc);
     ctx.closePath(); ctx.fill();
   };
   ctx.fillStyle = rgb(col); ctx.strokeStyle = rgb(col); ctx.lineCap = 'round';
-  wing(sg * 3 * sc, -sc, 0.55);                                      // aile éloignée
+  wing(-3 * sc, -sc, 0.55);                                                      // aile éloignée
   ctx.globalAlpha = 1;
-  for (let i = 0; i < N - 1; i++) {                                  // corps effilé
+  for (let i = 0; i < N - 1; i++) {                                              // corps effilé
     ctx.lineWidth = sc * (0.7 + 3.6 * Math.sin(Math.min(1, (i + 1) / 5) * Math.PI / 2) * (1 - i / N));
     ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[i + 1][0], P[i + 1][1]); ctx.stroke();
   }
-  wing(0, 0, 0.95);                                                  // aile proche
+  wing(0, 0, 0.95);                                                              // aile proche
   ctx.globalAlpha = 1;
-  const hx = P[0][0], hy = P[0][1];                                  // tête, museau, cornes
-  ctx.beginPath(); ctx.ellipse(hx + dir * sc * 1.5, hy, sc * 2.6, sc * 1.6, 0, 0, 6.2832); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(hx + dir * sc * 3, hy - sc * 1.4); ctx.lineTo(hx + dir * sc * 6.5, hy + sc * 0.3); ctx.lineTo(hx + dir * sc * 3, hy + sc * 1.4); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(sc * 1.5, 0, sc * 2.6, sc * 1.6, 0, 0, 6.2832); ctx.fill();                   // tête, museau, cornes
+  ctx.beginPath(); ctx.moveTo(sc * 3, -sc * 1.4); ctx.lineTo(sc * 6.5, sc * 0.3); ctx.lineTo(sc * 3, sc * 1.4); ctx.fill();
   ctx.lineWidth = Math.max(1, sc * 0.6);
-  ctx.beginPath(); ctx.moveTo(hx + dir * sc * 1, hy - sc * 1.3); ctx.lineTo(hx - dir * sc * 2.5, hy - sc * 3.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sc * 1, -sc * 1.3); ctx.lineTo(-sc * 2.5, -sc * 3.6); ctx.stroke();
   ctx.lineCap = 'butt';
-  glow(hx + dir * sc * 2.4, hy - sc * 0.5, sc * 7, nightK * 0.9);   // œil incandescent la nuit
+  glow(sc * 2.4, -sc * 0.5, sc * 7, nightK * 0.9);                               // œil incandescent la nuit
 
-  // Souffle de feu : gerbe de flammes qui jaillit de la gueule, monte vite puis s'éteint doucement
+  // Souffle de feu : gerbe de flammes rouge-orangé qui jaillit de la gueule, monte vite puis s'éteint doucement
   const age = T - d.fireT0, DUR = 1.9;
   if (age >= 0 && age < DUR) {
     const env = Math.min(1, age / 0.25) * Math.min(1, (DUR - age) / 0.7);
-    const len = sc * 78 * (0.35 + 0.65 * Math.min(1, age / 0.5));          // la flamme s'allonge
-    const mx = hx + dir * sc * 6.8, my = hy + sc * 0.5, ang = 0.2;
-    const dx = dir * Math.cos(ang), dy = Math.sin(ang);
-    const bright = sky.star > 0.4;                                          // additif la nuit, opaque le jour
-    const N = 38;
-    for (let i = 0; i < N; i++) {
-      const q = i / (N - 1), dist = q * len;
-      const jx = Math.sin(T * 23 + i * 7.3) * sc * (0.3 + q * 1.8);          // tremblement des flammes
+    const len = sc * 78 * (0.35 + 0.65 * Math.min(1, age / 0.5));                // la flamme s'allonge
+    const mx = sc * 6.8, my = sc * 0.5, ang = 0.2;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    const nightF = sky.star > 0.4;                                                // la nuit : lumière additive ; le jour : couleurs franches
+    ctx.globalCompositeOperation = nightF ? 'lighter' : 'source-over';
+    const NF = 40;
+    for (let i = 0; i < NF; i++) {
+      const q = i / (NF - 1), dist = q * len;
+      const jx = Math.sin(T * 23 + i * 7.3) * sc * (0.3 + q * 1.8);                // tremblement des flammes
       const jy = Math.cos(T * 19 + i * 5.1) * sc * (0.3 + q * 2) - q * q * sc * 5;   // elles montent en s'éloignant
       const size = sc * (4.5 + q * 15);
-      ctx.globalCompositeOperation = (bright || q < 0.5) ? 'lighter' : 'source-over';
-      ctx.globalAlpha = clamp(env * (1 - q) * 0.9 * (0.75 + 0.25 * Math.sin(T * 31 + i)), 0, 1);
-      ctx.drawImage(q < 0.45 ? GLOW_FIRE2 : GLOW_FIRE, mx + dx * dist + jx - size / 2, my + dy * dist + jy - size / 2, size, size);
+      ctx.globalAlpha = clamp(env * (1 - q * 0.8) * 0.85 * (0.75 + 0.25 * Math.sin(T * 31 + i)), 0, 1);
+      ctx.drawImage(q < 0.42 ? FLAME_ORANGE : FLAME_RED, mx + dx * dist + jx - size / 2, my + dy * dist + jy - size / 2, size, size);
     }
-    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = env;
-    ctx.drawImage(GLOW_FIRE2, mx - sc * 6, my - sc * 6, sc * 12, sc * 12);  // cœur incandescent à la gueule
-    for (let i = 0; i < 10; i++) {                                          // étincelles projetées
+    ctx.globalAlpha = env * 0.9;
+    ctx.drawImage(FLAME_ORANGE, mx - sc * 5, my - sc * 5, sc * 10, sc * 10);       // cœur de la flamme à la gueule
+    ctx.globalAlpha = env * 0.8;
+    ctx.drawImage(FLAME_CORE, mx - sc * 2.2, my - sc * 2.2, sc * 4.4, sc * 4.4);
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 10; i++) {                                                // étincelles projetées
       const tt = (T * 2 + i * 0.37) % 1, dist = len * (0.3 + tt * 0.9);
       ctx.globalAlpha = (1 - tt) * env * 0.9;
-      ctx.fillStyle = '#ffd27a';
-      ctx.fillRect(mx + dx * dist + Math.sin(i * 12.9) * sc * 4, my + dy * dist + Math.cos(i * 7.7) * sc * 4 + tt * sc * 6, sc * 0.6, sc * 0.6);
+      ctx.fillStyle = i % 2 ? '#ff6a1f' : '#ff9a3a';
+      ctx.fillRect(mx + dx * dist + Math.sin(i * 12.9) * sc * 4, my + dy * dist + Math.cos(i * 7.7) * sc * 4 + tt * sc * 6, sc * 0.7, sc * 0.7);
     }
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   }
+  ctx.restore();
 }
 function drawJellies(sky) {
   const vis = clamp(sky.star * 1.1, 0, 1) * (1 - wth.rain * 0.7) * (1 - wth.fog * 0.5);
@@ -2486,6 +2654,29 @@ function drawRays(x, y, k, col, reach) {
 }
 
 /* ==========================================================================
+   8j. BRUME DEVANT LES ÎLES : de longs voiles de brume dérivent lentement devant les îles (effet de perspective)
+   ========================================================================== */
+const mistC = mkCanvas(128);
+let mists = [];
+function buildMist() {
+  const r = rng(1212);
+  mists = Array.from({ length: 7 }, () => ({
+    x0: r() * (W + 800), y: (0.12 + r() * 0.42) * H, w: W * (0.35 + r() * 0.4),
+    v: 5 + r() * 9, a: 0.10 + r() * 0.08, ph: r() * 6.28
+  }));
+}
+function drawMist(sky) {
+  const dayK = clamp(1 - sky.star, 0, 1);
+  tintSprite(mistC, mix(sky.hor, [255, 255, 255], 0.3 * dayK));
+  for (const m of mists) {
+    const x = ((m.x0 + fogPh * m.v) % (W + 2 * m.w)) - m.w;
+    ctx.globalAlpha = clamp((m.a * (0.75 + 0.25 * Math.sin(T * 0.12 + m.ph)) + wth.fog * 0.12) * (1 - wth.rain * 0.3), 0, 0.6);
+    ctx.drawImage(mistC, x - m.w / 2, m.y - m.w * 0.07, m.w, m.w * 0.14);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ==========================================================================
    8i. OMBRES PORTÉES
    ========================================================================== */
 // Ombres sur le lac : îles, nuages et montgolfières projettent une tache d'ombre douce à l'opposé de la lumière,
@@ -2633,7 +2824,7 @@ function makeBalloonShape(rn) {
 }
 function respawnBalloon(b, first) {
   const near = crR();
-  b.near = near; b.s = U * (0.0020 + 0.0032 * near); b.haze = 0.32 * (1 - near);
+  b.near = near; b.s = U * (0.0010 + 0.0016 * near); b.haze = 0.32 * (1 - near);   // petite montgolfière, loin dans le ciel
   b.y0 = (0.10 + crR() * 0.28) * H; b.v = (5 + crR() * 8) * (U / 1920) * (0.6 + near * 0.8);
   b.pal = BALLOON_COLORS[(crR() * BALLOON_COLORS.length) | 0]; b.shape = makeBalloonShape(crR);
   b.ph = crR() * 6.28; b.period = 7 + crR() * 6;
@@ -2690,7 +2881,7 @@ function drawBalloons(sky) {
 }
 
 // Recrée tout ce qui dépend de la taille d'écran
-function buildWorld() { buildClouds(); buildPrecip(); buildBoats(); buildCreatures(); buildParticles(); buildPaint(); buildBalloons();
+function buildWorld() { buildClouds(); buildPrecip(); buildBoats(); buildCreatures(); buildParticles(); buildPaint(); buildBalloons(); buildMist();
   fogWisps = Array.from({ length: 9 }, (_, i) => ({ x: (i / 9) * (W + 800), y: HZ + (0.03 + 0.9 * ((i * 37) % 9) / 9) * (H - HZ), w: U * (0.45 + 0.35 * ((i * 53) % 7) / 7), v: 6 + (i % 4) * 3 })); }
 
 // Met à jour la météo lissée et toutes les animations indépendantes du dessin
@@ -2724,6 +2915,7 @@ buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build cr
 buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
 buildStars = safe('build étoiles', buildStars);
 drawIslandLife = safe('vie des îles', drawIslandLife); drawFalls = safe('cascades', drawFalls);
+drawMist = safe('brume', drawMist); buildMist = safe('build brume', buildMist);
 drawLakeShadows = safe('ombres du lac', drawLakeShadows); drawIslandShadows = safe('ombres des îles', drawIslandShadows);
 drawAurora = safe('aurores', drawAurora); drawRainbow = safe('arc-en-ciel', drawRainbow);
 drawBalloons = safe('montgolfières', drawBalloons); updateBalloons = safe('maj montgolfières', updateBalloons); buildBalloons = safe('build montgolfières', buildBalloons);
