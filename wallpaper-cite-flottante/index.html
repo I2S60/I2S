@@ -7,10 +7,13 @@
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #05070f; }
   canvas { display: block; width: 100%; height: 100%; }
+  #err { display: none; position: fixed; left: 8px; bottom: 8px; max-width: 92%; padding: 6px 10px; z-index: 9;
+         font: 12px/1.4 monospace; color: #ffc0c0; background: rgba(0,0,0,.7); white-space: pre-wrap; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="err"></div>
 
 <script>
 /* ==========================================================================
@@ -68,6 +71,29 @@ const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 // [r,g,b] -> "rgba(...)"
 const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+// Affiche les erreurs à l'écran (utile pour diagnostiquer dans Wallpaper Engine)
+function reportError(e, where) {
+  const el = document.getElementById('err');
+  const line = e && e.stack ? ' ' + String(e.stack).split('\n')[1] : '';
+  const msg = (where ? '[' + where + '] ' : '') + (e && e.message ? e.message : e) + line;
+  if (el) { el.style.display = 'block'; el.textContent += msg + '\n'; }
+  if (window.console) console.error(e);
+}
+window.addEventListener('error', ev => reportError(ev.error || ev.message, 'global'));
+
+// Isole une fonction facultative : si elle plante, elle est désactivée et le reste continue
+function safe(name, fn) {
+  let dead = false;
+  return function (...a) {
+    if (dead) return;
+    try { return fn.apply(this, a); }
+    catch (e) {
+      dead = true; reportError(e, name);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.setLineDash([]);
+    }
+  };
+}
 
 // Générateur pseudo-aléatoire à graine : le décor est identique à chaque lancement
 function rng(seed) {
@@ -168,7 +194,7 @@ TREE.ellipse(-2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
 TREE.ellipse(2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
 
 function resize() {
-  W = window.innerWidth; H = window.innerHeight;
+  W = window.innerWidth || 1920; H = window.innerHeight || 1080;   // repli si la fenêtre n'a pas encore de taille
   canvas.width  = Math.round(W * cfg.renderScale);
   canvas.height = Math.round(H * cfg.renderScale);
   HZ = H * 0.64;                           // ligne d'horizon
@@ -505,11 +531,11 @@ function drawFrame(sky, hour) {
     lp.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
     if (k > 0) lp.ellipse(0, 0, k * r, r, 0, Math.PI / 2, -Math.PI / 2, true);
     else       lp.ellipse(0, 0, -k * r, r, 0, Math.PI / 2, Math.PI * 1.5, false);
-    let litPath = lp;
-    if (ph > 0.5) { litPath = new Path2D(); litPath.addPath(lp, new DOMMatrix([-1, 0, 0, 1, 0, 0])); } // lune décroissante : côté gauche
     ctx.fillStyle = '#f2efe2';
-    ctx.fill(litPath);
-    ctx.clip(litPath);
+    if (ph > 0.5) ctx.scale(-1, 1);                          // lune décroissante : côté gauche éclairé
+    ctx.fill(lp);
+    ctx.clip(lp);
+    if (ph > 0.5) ctx.scale(-1, 1);                          // les mers lunaires gardent leur orientation
     ctx.fillStyle = 'rgba(150,155,175,0.42)';                 // mers lunaires et cratères
     for (const [dx, dy, rx, ry] of [[-0.32, -0.25, 0.3, 0.22], [0.22, -0.12, 0.24, 0.2], [-0.1, 0.3, 0.26, 0.18], [0.38, 0.3, 0.14, 0.12], [-0.5, 0.1, 0.12, 0.1]]) {
       ctx.beginPath(); ctx.ellipse(dx * r, dy * r, rx * r, ry * r, 0.4, 0, 6.2832); ctx.fill();
@@ -1313,6 +1339,23 @@ function updateWorld(dt) {
 }
 
 /* --------------------------------------------------------------------------
+   Protection des modules facultatifs : si l'un plante (navigateur ancien...), il est
+   désactivé, l'erreur s'affiche en bas à gauche et le reste du décor continue.
+   -------------------------------------------------------------------------- */
+drawClouds = safe('nuages', drawClouds);        drawLightning = safe('éclairs', drawLightning);
+drawJellies = safe('créatures', drawJellies);   drawBirds = safe('oiseaux', drawBirds);
+drawDragon = safe('dragon', drawDragon);        drawBoats = safe('barques', drawBoats);
+drawParticles = safe('particules', drawParticles); drawRays = safe('rayons', drawRays);
+drawFog = safe('brouillard', drawFog);          drawPrecip = safe('précipitations', drawPrecip);
+drawPaint = safe('peinture', drawPaint);
+updatePrecip = safe('maj précipitations', updatePrecip); updateBoats = safe('maj barques', updateBoats);
+updateCreatures = safe('maj créatures', updateCreatures); updatePetals = safe('maj pétales', updatePetals);
+buildClouds = safe('build nuages', buildClouds); buildPrecip = safe('build pluie', buildPrecip);
+buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build créatures', buildCreatures);
+buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
+buildStars = safe('build étoiles', buildStars);
+
+/* --------------------------------------------------------------------------
    9. BOUCLE PRINCIPALE
    -------------------------------------------------------------------------- */
 let last = 0, fpsAcc = 0, fpsCount = 0, fpsShown = 0, lampBase = 0;
@@ -1323,12 +1366,14 @@ function frame(ms) {
   const dt = Math.min((ms - last) / 1000, 0.1);
   last = ms; T += dt;
 
-  updateHour(dt);
-  updateWorld(dt);
-  const sky = skyAt(hourShown);
-  lampBase = clamp(sky.star / 0.6, 0, 1);                // éclairage décidé avant que la météo ne masque les étoiles
-  applyWeather(sky);
-  drawFrame(sky, hourShown);
+  try {
+    updateHour(dt);
+    updateWorld(dt);
+    const sky = skyAt(hourShown);
+    lampBase = clamp(sky.star / 0.6, 0, 1);              // éclairage décidé avant que la météo ne masque les étoiles
+    applyWeather(sky);
+    drawFrame(sky, hourShown);
+  } catch (e) { reportError(e, 'image'); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
 
   if (cfg.debug) {
     fpsAcc += dt; fpsCount++;
