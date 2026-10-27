@@ -16,12 +16,13 @@
       "type": "dropdown",
       "text": "Mode test : forcer la météo",
       "value": 0,
-      "items": ["Automatique (API Open-Meteo)", "Ciel dégagé", "Nuageux", "Brouillard", "Pluie", "Orage", "Neige", "Vent fort"]
+      "items": ["Automatique (API Open-Meteo)", "Ciel dégagé", "Nuageux", "Brouillard", "Pluie", "Orage", "Neige", "Vent fort", "Pluie et soleil (arc-en-ciel)"]
     },
 
     "folder_render": { "type": "label", "value": "Ambiance et performances" },
     "particles": { "type": "slider", "text": "Intensité des particules", "min": 0, "max": 2, "step": 0.1, "value": 1 },
     "painted": { "type": "slider", "text": "Effet peinture (grain de toile)", "min": 0, "max": 1, "step": 0.05, "value": 0.7 },
+    "aurora": { "type": "slider", "text": "Aurores boréales (la nuit)", "min": 0, "max": 1, "step": 0.05, "value": 0.7 },
     "godrays": { "type": "slider", "text": "Rayons de lumière", "min": 0, "max": 1, "step": 0.05, "value": 0.4 },
     "floatamp": { "type": "slider", "text": "Amplitude du flottement des îles", "min": 0, "max": 3, "step": 0.1, "value": 1 },
     "renderscale": { "type": "slider", "text": "Résolution de rendu (baisser si ça rame)", "min": 0.5, "max": 1, "step": 0.05, "value": 1 }

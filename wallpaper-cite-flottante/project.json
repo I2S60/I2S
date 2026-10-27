@@ -94,6 +94,17 @@
         "fraction": true,
         "precision": 2
       },
+      "aurora": {
+        "order": 15,
+        "text": "Aurores boréales (la nuit)",
+        "type": "slider",
+        "value": 0.7,
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "fraction": true,
+        "precision": 2
+      },
       "showclock": {
         "order": 14,
         "text": "Afficher l'heure à l'écran",
@@ -131,7 +142,8 @@
           { "label": "Pluie", "value": "rain" },
           { "label": "Orage", "value": "storm" },
           { "label": "Neige", "value": "snow" },
-          { "label": "Vent fort", "value": "wind" }
+          { "label": "Vent fort", "value": "wind" },
+          { "label": "Pluie et soleil (arc-en-ciel)", "value": "sunshower" }
         ]
       },
       "renderscale": {
