@@ -800,8 +800,6 @@ function drawBridge(br, sky) {
   const lw = Math.max(1.3, U * 0.002), rail = U * 0.0075, off = lw * 2.7;
   const curve = (dy, extraX) => { ctx.beginPath(); ctx.moveTo(x0, y0 + dy); ctx.quadraticCurveTo(dcx, dcy + dy, x1, y1 + dy); };
   ctx.lineCap = 'butt';
-  ctx.strokeStyle = rgb(dark, 0.9); ctx.lineWidth = lw * 1.2;                                        // treillis sous le tablier
-  ctx.setLineDash([lw * 2.2, lw * 1.8]); curve(off * 0.85); ctx.stroke(); ctx.setLineDash([]);
   ctx.strokeStyle = rgb(dark); ctx.lineWidth = lw * 3.4; curve(0); ctx.stroke();                     // tablier
   ctx.strokeStyle = rgb(hi, 0.75); ctx.lineWidth = lw * 0.9; curve(-lw * 1.2); ctx.stroke();         // liseré clair sur le dessus
   ctx.strokeStyle = rgb(cable); ctx.lineWidth = lw * 1.1; curve(-rail); ctx.stroke();                // garde-corps
@@ -2227,7 +2225,7 @@ function spawnFlock(f, onScreen) {
   if (kB === kA) kB = FORMATIONS[(FORMATIONS.indexOf(kA) + 1 + ((crR() * 4) | 0)) % FORMATIONS.length];
   f.kind = solo ? 'solo' : kA + '→' + kB;
   f.mr = 0.04 + crR() * 0.08;                                          // vitesse de transformation (période 50 à 150 s)
-  f.v = (22 + crR() * 50) * (U / 1920); f.y = (0.07 + crR() * 0.34) * H; f.ph = crR() * 6.28;
+  f.v = (13 + crR() * 28) * (U / 1920); f.y = (0.07 + crR() * 0.34) * H; f.ph = crR() * 6.28;   // vol tranquille
   // Style de battement : continu, par salves ou longs planés ; les rapaces solitaires planent surtout
   const style = crR();
   f.glideBias = solo ? 1.0 : style < 0.5 ? -0.2 : 0.4;
@@ -2236,7 +2234,7 @@ function spawnFlock(f, onScreen) {
   f.path = solo && crR() < 0.6 ? 'soar' : FLIGHT_PATHS[(crR() * FLIGHT_PATHS.length) | 0];
   f.amp = H * (0.008 + crR() * 0.02); f.freq = 0.15 + crR() * 0.25;          // légère ondulation de l'altitude, lente
   f.vamp = 0.02 + crR() * 0.04; f.vfreq = 0.1 + crR() * 0.2;                // vitesse quasi constante
-  f.rate = 6 + crR() * 1.5;                                                  // cadence de battement commune à toute la volée
+  f.rate = 3.2 + crR() * 0.8;                                                // cadence de battement lente, commune à toute la volée
   f.age = 0; f.pathT0 = 0; f.mirror = dir; f.mode = 'path'; f.theta = dir > 0 ? 0 : Math.PI; f.vx = dir * f.v; f.vy = 0; f.cy = f.y;
   const near = islands.filter(i => i.haze < 0.35);
   if (f.path === 'orbit' && near.length) {                             // ronde autour d'une île, puis départ
@@ -2788,7 +2786,7 @@ function makeBalloonShape(rn) {
 function respawnBalloon(b, first) {
   const near = crR();
   b.near = near; b.s = U * (0.0010 + 0.0016 * near); b.haze = 0.32 * (1 - near);   // petite montgolfière, loin dans le ciel
-  b.y0 = (0.10 + crR() * 0.28) * H; b.v = (5 + crR() * 8) * (U / 1920) * (0.6 + near * 0.8);
+  b.y0 = (0.10 + crR() * 0.28) * H; b.v = (1.6 + crR() * 2.4) * (U / 1920) * (0.6 + near * 0.8);          // dérive très lente
   b.pal = BALLOON_COLORS[(crR() * BALLOON_COLORS.length) | 0]; b.shape = makeBalloonShape(crR);
   b.ph = crR() * 6.28; b.period = 7 + crR() * 6;
   if (!first) b.x = -30 * b.s;
@@ -2798,7 +2796,7 @@ function buildBalloons() {
 }
 function updateBalloons(dt) {
   for (const b of balloons) {
-    b.x += b.v * dt * (0.6 + windK * 2.2);                              // le vent les pousse vers la droite
+    b.x += b.v * dt * (0.7 + windK * 0.8);                              // le vent la pousse doucement vers la droite
     if (b.x > W + 30 * b.s) respawnBalloon(b, false);
   }
 }
