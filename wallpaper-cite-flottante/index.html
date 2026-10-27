@@ -1060,6 +1060,7 @@ function drawFrame(sky, hour) {
   /* --- Rive proche --- */
   ctx.fillStyle = mtnFill(mountains[2]);
   ctx.fill(mountains[2].path);
+  drawWaterfalls(sky, 0);                                       // cascades : partie au-dessus de l'horizon
 
   /* --- Lac --- */
   // Eau franchement bleue (turquoise le jour, bleu nuit la nuit) : la teinte de l'eau prend le dessus sur celle du ciel,
@@ -1085,6 +1086,7 @@ function drawFrame(sky, hour) {
   drawAurora(sky, auroraNow * 0.3);                            // reflet des aurores dans le lac
   ctx.restore();
   drawLakeShadows();                                           // ombres portées sur l'eau
+  drawWaterfalls(sky, 1);                                      // cascades : arrivée dans le lac, éclaboussures
 
   // Reflet du soleil / de la lune : traînée scintillante
   const lightSrc = sunAlt > -0.05 && glowK + sunAlt > 0.02
@@ -1282,7 +1284,6 @@ function drawIsland(isl, sky) {
   ctx.rotate(tilt);
   ctx.scale(isl.s, isl.s);
 
-  drawFalls(isl, sky);                                                    // cascade, derrière le rocher
 
   // Dégradé : surface nette, base du rocher fondue dans la brume
   const gr = ctx.createLinearGradient(0, -30, 0, isl.depth);
@@ -1348,23 +1349,31 @@ for (let k = 0; k < 4; k++) {
   poly([[2.2, 0.3], [8.4, 0.3], [8.4, 2.5], [2.2, 2.1]]); BLADES.closePath();         // toile
 }
 
-// Cascade : nappe d'eau qui jaillit de derrière le rebord du rocher, s'affine puis s'évase en tombant, avec des filets
-// brillants qui dévalent, de l'écume à la source et des nuages d'embruns à l'arrivée
-function drawFalls(isl, sky) {
-  if (!isl.falls.length) return;
-  const w = mix(sky.hor, [255, 255, 255], 0.65), ga = ctx.globalAlpha * (0.55 + 0.45 * clamp(1 - sky.star, 0, 1));
-  const N = 14;
-  for (const f of isl.falls) {
-    const k = f.w, L = f.len, sx = f.x - f.side * 2.4, sy = f.y - 0.9;          // la source est cachée derrière le rocher
-    const cx = t => sx + f.side * (2.2 * t) + windK * 7 * t * t + Math.sin(T * 1.3 + t * 6 + f.x) * 0.45 * t;
-    const wd = t => k * (2.8 - 3.2 * t + 5.4 * t * t);                           // largeur : large, fine, puis évasée
-    // nappe : polygone dont la largeur varie, dégradé qui s'efface vers le bas
+// Cascades : nappe d'eau qui part du rocher et tombe jusqu'au lac, tout en bas. Elle s'affine puis s'évase en tombant, avec des
+// filets brillants qui dévalent, de l'écume à la source, et des éclaboussures et embruns à l'arrivée dans l'eau.
+// Dessinée en deux passes dans le repère de l'écran : part 0 = au-dessus de l'horizon (avant les montagnes proches et le lac),
+// part 1 = sur le lac (après le dessin de l'eau, qui sinon la recouvrirait).
+function drawWaterfalls(sky, part) {
+  const lh = H - HZ, dayK = clamp(1 - sky.star, 0, 1);
+  const w = mix(sky.hor, [255, 255, 255], 0.65), ga = 0.55 + 0.45 * dayK, N = 16;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, part === 0 ? 0 : HZ, W, part === 0 ? HZ + 1 : lh); ctx.clip();
+  for (const isl of islands) for (const f of isl.falls) {
+    const [sx, sy] = anchor(isl, f.x, f.y);                                 // départ sur le rocher (suit le flottement de l'île)
+    const altF = clamp((HZ - isl.y) / (H * 0.5), 0.1, 1);
+    const yl = HZ + lh * (0.06 + 0.45 * altF);                              // point d'arrivée dans le lac, sous l'île
+    const L = yl - sy;
+    if (L < 12) continue;
+    const k = Math.max(f.w * isl.s * 1.9, U * 0.0016 * f.w);                                                  // unité de largeur en pixels
+    const cx = t => sx + f.side * 2.2 * k * t + windK * 7 * k * t * t + Math.sin(T * 1.3 + t * 6 + f.x) * 0.45 * k * t;
+    const wd = t => k * (2.8 - 3.2 * t + 5.4 * t * t);                      // largeur : large, fine, puis évasée
+    // nappe : polygone dont la largeur varie, dégradé qui reste visible jusqu'à l'eau
     ctx.beginPath();
     for (let i = 0; i <= N; i++) { const t = i / N; ctx.lineTo(cx(t) - wd(t) / 2, sy + t * L); }
     for (let i = N; i >= 0; i--) { const t = i / N; ctx.lineTo(cx(t) + wd(t) / 2, sy + t * L); }
     ctx.closePath();
-    const g = ctx.createLinearGradient(0, sy, 0, sy + L);
-    g.addColorStop(0, rgb(w, 0.85)); g.addColorStop(0.55, rgb(w, 0.5)); g.addColorStop(1, rgb(w, 0));
+    const g = ctx.createLinearGradient(0, sy, 0, yl);
+    g.addColorStop(0, rgb(w, 0.85)); g.addColorStop(0.5, rgb(w, 0.55)); g.addColorStop(1, rgb(w, 0.42));
     ctx.globalAlpha = ga; ctx.fillStyle = g; ctx.fill();
     // filets brillants qui coulent à des vitesses différentes à l'intérieur de la nappe
     ctx.lineCap = 'round';
@@ -1372,20 +1381,30 @@ function drawFalls(isl, sky) {
       const off = (j - 1.5) * 0.3;
       ctx.beginPath();
       for (let i = 0; i <= N; i++) { const t = i / N; ctx.lineTo(cx(t) + off * wd(t), sy + t * L); }
-      ctx.strokeStyle = rgb([255, 255, 255], 0.75); ctx.lineWidth = 0.42 * k;
-      ctx.setLineDash([3.5 + j, 3 + j * 0.8]); ctx.lineDashOffset = -T * (22 + j * 7) - f.x * 3;
+      ctx.strokeStyle = rgb([255, 255, 255], 0.75); ctx.lineWidth = Math.max(1, 0.42 * k);
+      ctx.setLineDash([(3.5 + j) * isl.s, (3 + j * 0.8) * isl.s]); ctx.lineDashOffset = -T * (22 + j * 7) * isl.s - f.x * 3;
       ctx.globalAlpha = ga * 0.8; ctx.stroke();
     }
     ctx.setLineDash([]); ctx.lineCap = 'butt';
-    // écume au rebord et nuages d'embruns au pied
-    ctx.globalAlpha = ga * 0.85; ctx.drawImage(GLOW_MIST, sx - 3.2 * k, sy - 2.2 * k, 6.4 * k, 4.4 * k);
-    for (let i = 0; i < 3; i++) {
-      const dx = Math.sin(T * 0.7 + i * 2.1 + f.x) * 2.2 * k, sz = (13 + i * 5) * k;
-      ctx.globalAlpha = ga * (0.34 - i * 0.07);
-      ctx.drawImage(GLOW_MIST, cx(1) + dx - sz / 2, sy + L - i * 2.2 * k - sz * 0.35, sz, sz * 0.7);
+    if (part === 0) {                                                       // écume à la source
+      ctx.globalAlpha = ga * 0.85; ctx.drawImage(GLOW_MIST, sx - 3.2 * k, sy - 2.2 * k, 6.4 * k, 4.4 * k);
+    } else {                                                                // impact dans le lac : anneaux d'écume qui s'élargissent et embruns
+      const ex = cx(1), foam = mix(sky.hor, [255, 255, 255], 0.6);
+      ctx.lineWidth = Math.max(1, k * 0.35);
+      for (let i = 0; i < 3; i++) {
+        const q = (((T * 0.5 + i / 3 + f.x * 0.01) % 1) + 1) % 1;               // phase entre 0 et 1 (même pour f.x négatif)
+        ctx.strokeStyle = rgb(foam, (1 - q) * 0.55 * ga);
+        ctx.beginPath(); ctx.ellipse(ex, yl, k * (4 + q * 14), k * (1 + q * 3.4), 0, 0, 6.2832); ctx.stroke();
+      }
+      for (let i = 0; i < 4; i++) {
+        const dx = Math.sin(T * 0.7 + i * 2.1 + f.x) * 3 * k, sz = (16 + i * 6) * k;
+        ctx.globalAlpha = ga * (0.38 - i * 0.07);
+        ctx.drawImage(GLOW_MIST, ex + dx - sz / 2, yl - i * 2.4 * k - sz * 0.32, sz, sz * 0.65);
+      }
     }
-    ctx.globalAlpha = ga;
+    ctx.globalAlpha = 1;
   }
+  ctx.restore();
 }
 
 // Lianes qui pendent sous le rocher et se balancent avec le vent
@@ -2875,7 +2894,7 @@ buildClouds = safe('build nuages', buildClouds); buildPrecip = safe('build pluie
 buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build créatures', buildCreatures);
 buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
 buildStars = safe('build étoiles', buildStars);
-drawIslandLife = safe('vie des îles', drawIslandLife); drawFalls = safe('cascades', drawFalls);
+drawIslandLife = safe('vie des îles', drawIslandLife); drawWaterfalls = safe('cascades', drawWaterfalls);
 drawMist = safe('brume', drawMist); buildMist = safe('build brume', buildMist);
 drawLakeShadows = safe('ombres du lac', drawLakeShadows); drawIslandShadows = safe('ombres des îles', drawIslandShadows);
 drawAurora = safe('aurores', drawAurora); drawRainbow = safe('arc-en-ciel', drawRainbow);
