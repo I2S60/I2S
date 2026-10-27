@@ -1,0 +1,66 @@
+{
+  "file": "index.html",
+  "title": "Cité des îles flottantes",
+  "type": "web",
+  "preview": "preview.jpg",
+  "description": "Une cité fantastique sur des îles flottantes au-dessus d'un lac de montagne. Le ciel suit l'heure réelle de votre PC.",
+  "tags": ["Fantasy", "Landscape", "Relaxing"],
+  "general": {
+    "properties": {
+      "schemecolor": {
+        "order": 0,
+        "text": "ui_browse_properties_scheme_color",
+        "type": "color",
+        "value": "0.2 0.3 0.5"
+      },
+      "cyclespeed": {
+        "order": 1,
+        "text": "Vitesse du cycle jour/nuit (1 = temps réel)",
+        "type": "slider",
+        "value": 1,
+        "min": 1,
+        "max": 720,
+        "step": 1
+      },
+      "testmode": {
+        "order": 2,
+        "text": "Mode test : forcer l'heure",
+        "type": "bool",
+        "value": false
+      },
+      "testhour": {
+        "order": 3,
+        "text": "Heure forcée (mode test)",
+        "type": "slider",
+        "value": 19,
+        "min": 0,
+        "max": 24,
+        "step": 0.1,
+        "fraction": true,
+        "precision": 1
+      },
+      "floatamp": {
+        "order": 4,
+        "text": "Amplitude du flottement des îles",
+        "type": "slider",
+        "value": 1,
+        "min": 0,
+        "max": 3,
+        "step": 0.1,
+        "fraction": true,
+        "precision": 1
+      },
+      "renderscale": {
+        "order": 5,
+        "text": "Résolution de rendu (baisser si ça rame)",
+        "type": "slider",
+        "value": 1,
+        "min": 0.5,
+        "max": 1,
+        "step": 0.05,
+        "fraction": true,
+        "precision": 2
+      }
+    }
+  }
+}

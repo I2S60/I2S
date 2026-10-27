@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Cité des îles flottantes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070f; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+/* ==========================================================================
+   CITÉ DES ÎLES FLOTTANTES — Wallpaper Engine (web wallpaper)
+   Version 1 : ciel lié à l'heure réelle, lac, montagnes, îles en silhouette.
+   Rendu : Canvas 2D uniquement, aucune dépendance externe.
+
+   Paramètres de test dans un navigateur classique (hors Wallpaper Engine) :
+     index.html?hour=18.5      -> force l'heure (18h30)
+     index.html?speed=300      -> accélère le cycle (300x)
+     index.html?debug          -> affiche l'heure et les FPS
+   ========================================================================== */
+(() => {
+'use strict';
+
+/* --------------------------------------------------------------------------
+   1. CONFIGURATION (modifiée par les propriétés de Wallpaper Engine)
+   -------------------------------------------------------------------------- */
+const cfg = {
+  cycleSpeed:  1,      // 1 = temps réel ; 60 = 1 minute réelle = 1 heure
+  testMode:    false,  // true = heure forcée
+  testHour:    19,     // heure forcée (0-24)
+  floatAmp:    1,      // amplitude du flottement des îles
+  renderScale: 1,      // résolution interne (0.5 à 1)
+  fpsLimit:    60,     // fournie par Wallpaper Engine (réglage « FPS » global)
+  debug:       false
+};
+
+// Paramètres d'URL, pratiques pour tester dans Chrome/Firefox
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (q.has('hour'))  { cfg.testMode = true; cfg.testHour = parseFloat(q.get('hour')) || 0; }
+  if (q.has('speed')) cfg.cycleSpeed = parseFloat(q.get('speed')) || 1;
+  if (q.has('debug')) cfg.debug = true;
+})();
+
+/* --------------------------------------------------------------------------
+   2. OUTILS (maths, couleurs, aléatoire reproductible)
+   -------------------------------------------------------------------------- */
+const clamp  = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp   = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+
+// "#rrggbb" -> [r, g, b]
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+// Mélange de deux couleurs [r,g,b]
+const mix = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+// [r,g,b] -> "rgba(...)"
+const rgb = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+// Générateur pseudo-aléatoire à graine : le décor est identique à chaque lancement
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* --------------------------------------------------------------------------
+   3. CYCLE JOUR / NUIT : couleurs clés selon l'heure
+      top  = zénith, hor = horizon, glow = halo du soleil,
+      sil  = couleur des silhouettes (îles, montagnes), star = visibilité étoiles
+   -------------------------------------------------------------------------- */
+const KEYS = [
+  { h: 0,    top: '#040612', hor: '#0c1330', glow: '#2a3a7a', sil: '#03050c', star: 1    }, // nuit profonde
+  { h: 4.5,  top: '#070b24', hor: '#161d46', glow: '#33407f', sil: '#04060f', star: 1    },
+  { h: 5.5,  top: '#1c2760', hor: '#5a4a86', glow: '#ff8a66', sil: '#0a0c1c', star: 0.6  }, // aube
+  { h: 6.3,  top: '#3b5a9e', hor: '#f7a679', glow: '#ffb878', sil: '#2a2740', star: 0.1  },
+  { h: 7.5,  top: '#4a86c8', hor: '#d5e4ee', glow: '#fff0c8', sil: '#35506a', star: 0    }, // matin
+  { h: 12,   top: '#2b78d2', hor: '#a8d3f3', glow: '#fffbe8', sil: '#2f4a66', star: 0    }, // midi
+  { h: 16.5, top: '#3a82cc', hor: '#bcd9ee', glow: '#fff2cc', sil: '#31485f', star: 0    },
+  { h: 18,   top: '#3f5da0', hor: '#f0b58a', glow: '#ffb070', sil: '#3a3350', star: 0    }, // fin d'après-midi
+  { h: 19.2, top: '#2b3170', hor: '#ff7d52', glow: '#ff6a3a', sil: '#1c1530', star: 0.05 }, // coucher
+  { h: 20,   top: '#1a1d50', hor: '#8a4c7e', glow: '#d9607a', sil: '#0d0b1e', star: 0.5  }, // crépuscule
+  { h: 21,   top: '#0a0e2c', hor: '#1d2352', glow: '#3a4a8a', sil: '#06081a', star: 1    },
+  { h: 24,   top: '#040612', hor: '#0c1330', glow: '#2a3a7a', sil: '#03050c', star: 1    }  // = 0h (boucle)
+].map(k => ({ h: k.h, top: hex(k.top), hor: hex(k.hor), glow: hex(k.glow), sil: hex(k.sil), star: k.star }));
+
+// Interpole deux clés voisines avec une courbe douce : jamais de saut brusque
+function skyAt(h) {
+  let i = 0;
+  while (i < KEYS.length - 2 && h >= KEYS[i + 1].h) i++;
+  const a = KEYS[i], b = KEYS[i + 1];
+  const t = smooth(clamp((h - a.h) / (b.h - a.h), 0, 1));
+  return {
+    top:  mix(a.top,  b.top,  t),
+    hor:  mix(a.hor,  b.hor,  t),
+    glow: mix(a.glow, b.glow, t),
+    sil:  mix(a.sil,  b.sil,  t),
+    star: lerp(a.star, b.star, t)
+  };
+}
+
+/* --------------------------------------------------------------------------
+   4. ÉTAT GLOBAL ET REDIMENSIONNEMENT
+   -------------------------------------------------------------------------- */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W = 0, H = 0, HZ = 0, U = 0;   // largeur, hauteur, ligne d'horizon, unité de taille
+let mountains = [];                // couches de montagnes
+let islands = [];                  // îles flottantes
+let stars = [];                    // étoiles
+
+const TREE = new Path2D();         // forme d'arbre partagée (silhouette)
+TREE.rect(-0.7, -5, 1.4, 5.5);
+TREE.ellipse(0, -9.5, 4.2, 5.6, 0, 0, Math.PI * 2);
+TREE.ellipse(-2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
+TREE.ellipse(2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width  = Math.round(W * cfg.renderScale);
+  canvas.height = Math.round(H * cfg.renderScale);
+  HZ = H * 0.64;                           // ligne d'horizon
+  U  = Math.min(W, H * 1.78);              // unité qui évite les îles géantes en ultra-wide
+  buildMountains();
+  buildIslands();
+  buildStars();
+}
+
+/* --------------------------------------------------------------------------
+   5. MONTAGNES (procédurales, encadrent le lac)
+   -------------------------------------------------------------------------- */
+function buildMountains() {
+  // couches : de la plus lointaine (brumeuse) à la plus proche (sombre)
+  const defs = [
+    { seed: 11, amp: 0.30, haze: 0.62, edge: 0.30, pow: 1.3, f: 0.0035 },
+    { seed: 23, amp: 0.22, haze: 0.42, edge: 0.15, pow: 1.5, f: 0.0050 },
+    { seed: 37, amp: 0.12, haze: 0.20, edge: 0.00, pow: 2.3, f: 0.0075 }
+  ];
+  mountains = defs.map(d => {
+    const r = rng(d.seed), tbl = Array.from({ length: 512 }, r);
+    const noise = x => {                               // bruit 1D interpolé
+      const i = Math.floor(x), f = smooth(x - i);
+      return lerp(tbl[((i % 512) + 512) % 512], tbl[(((i + 1) % 512) + 512) % 512], f);
+    };
+    const amp = d.amp * H, p = new Path2D();
+    p.moveTo(0, HZ + 3);
+    for (let x = 0; x <= W + 6; x += 6) {
+      let n = 0, a = 1, s = 0;
+      for (let o = 0; o < 5; o++) { n += a * noise(x * d.f * (1 << o) + d.seed * 7); s += a; a *= 0.5; }
+      n /= s;
+      const ridge = 1 - Math.abs(2 * n - 1);           // arêtes pointues
+      const env = d.edge + (1 - d.edge) * Math.pow(Math.abs(2 * x / W - 1), d.pow);
+      p.lineTo(x, HZ - env * amp * (0.25 + 0.75 * (0.5 * n + 0.5 * ridge)));
+    }
+    p.lineTo(W + 6, HZ + 3);
+    p.closePath();
+    return { path: p, amp, haze: d.haze };
+  });
+}
+
+/* --------------------------------------------------------------------------
+   6. ÎLES FLOTTANTES (silhouettes + arbres + bâtiments)
+      Coordonnées locales : l'île fait 100 unités de large, surface en y = 0.
+   -------------------------------------------------------------------------- */
+function buildIslands() {
+  // x, alt = hauteur au-dessus de l'horizon (fraction de H), size = largeur (fraction de U)
+  const defs = [
+    { x: 0.42, alt: 0.37, size: 0.21, haze: 0.00 },   // île principale
+    { x: 0.71, alt: 0.43, size: 0.13, haze: 0.10 },
+    { x: 0.17, alt: 0.31, size: 0.12, haze: 0.12 },
+    { x: 0.89, alt: 0.31, size: 0.07, haze: 0.28 },
+    { x: 0.58, alt: 0.25, size: 0.06, haze: 0.30 },
+    { x: 0.07, alt: 0.47, size: 0.06, haze: 0.30 },
+    { x: 0.29, alt: 0.50, size: 0.05, haze: 0.38 }
+  ];
+  islands = defs.map((d, n) => {
+    const r = rng(1000 + n * 977);
+    const s = d.size * U / 100;                    // échelle local -> pixels
+    const depth = 50 + r() * 22;                   // profondeur du rocher
+
+    // Surface : légères collines
+    const hill = x => -3.2 * Math.sin(x * 0.08 + n) - 1.4 * Math.sin(x * 0.21 + n * 2);
+    const body = new Path2D();
+    body.moveTo(-50, 0);
+    for (let x = -50; x <= 50; x += 5) body.lineTo(x, hill(x));
+    // Face inférieure : cône de roche irrégulier, côté droit puis côté gauche
+    const tipX = (r() - 0.5) * 8, steps = 7;
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps;
+      body.lineTo(lerp(50, tipX, t) - (r() * 6) * (1 - t) * 0.6, depth * Math.pow(t, 0.85) + (r() - 0.5) * 3);
+    }
+    for (let k = steps - 1; k >= 1; k--) {
+      const t = k / steps;
+      body.lineTo(lerp(-50, tipX, t) + (r() * 6) * (1 - t) * 0.6, depth * Math.pow(t, 0.85) + (r() - 0.5) * 3);
+    }
+    body.closePath();
+
+    // Bâtiments et arbres répartis sur 8 emplacements
+    const structs = new Path2D(), trees = [], bldgs = [];
+    const slots = 8, slotW = 80 / slots;
+    for (let k = 0; k < slots; k++) {
+      const cx = -40 + slotW * (k + 0.5) + (r() - 0.5) * 2;
+      const y = hill(cx), kind = r();
+      if (d.size < 0.07 && kind < 0.55) continue;               // petites îles : moins chargées
+      if (kind < 0.45) {                                         // arbre
+        trees.push({ x: cx, y, sc: 0.8 + r() * 0.7, ph: r() * 6.28 });
+      } else if (kind < 0.8) {                                   // maison avec toit
+        const w = 6 + r() * 4, h = 6 + r() * 8;
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx, y - h - 5); structs.lineTo(cx + w / 2 + 1, y - h);
+        bldgs.push({ x: cx, y, w, h });
+      } else {                                                   // tour avec flèche
+        const w = 4 + r() * 2, h = 22 + r() * 22;
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        structs.rect(cx - w / 2 - 1, y - h - 2, w + 2, 3);
+        structs.moveTo(cx - w / 2 - 1.5, y - h - 2); structs.lineTo(cx, y - h - 13); structs.lineTo(cx + w / 2 + 1.5, y - h - 2);
+        structs.rect(cx - 0.25, y - h - 18, 0.5, 6);
+        bldgs.push({ x: cx, y, w, h, tower: true });
+      }
+    }
+    return {
+      x: d.x * W, y: HZ - d.alt * H, s, depth, haze: d.haze, body, structs, trees, bldgs,
+      ph: r() * 6.28, f: 0.35 + r() * 0.35,        // phase et fréquence du flottement
+      bobAmp: (0.004 + d.size * 0.02) * H          // amplitude : les grandes îles bougent un peu plus
+    };
+  });
+  islands.sort((a, b) => b.haze - a.haze);          // les plus lointaines d'abord
+}
+
+function buildStars() {
+  const r = rng(77);
+  stars = Array.from({ length: 260 }, () => ({
+    x: r() * W, y: Math.pow(r(), 1.3) * HZ * 0.95,
+    s: r() < 0.08 ? 2 : 1, ph: r() * 6.28, sp: 0.8 + r() * 2
+  }));
+}
+
+/* --------------------------------------------------------------------------
+   7. HEURE VIRTUELLE
+   -------------------------------------------------------------------------- */
+let extraHours = 0;     // avance accumulée quand le cycle est accéléré
+let hourShown = null;   // heure affichée (lissée pour éviter les sauts)
+
+function realHour() {
+  const d = new Date();
+  return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600 + d.getMilliseconds() / 3.6e6;
+}
+
+function updateHour(dt) {
+  extraHours += dt * (cfg.cycleSpeed - 1) / 3600;
+  const target = cfg.testMode ? cfg.testHour : ((realHour() + extraHours) % 24 + 24) % 24;
+  if (hourShown === null) { hourShown = target; return; }
+  // Rapprochement par le plus court chemin sur le cercle de 24 h
+  const d = ((target - hourShown + 36) % 24) - 12;
+  hourShown = ((hourShown + d * (1 - Math.exp(-dt * 2.5))) % 24 + 24) % 24;
+}
+
+/* --------------------------------------------------------------------------
+   8. DESSIN
+   -------------------------------------------------------------------------- */
+let T = 0;  // temps d'animation en secondes
+
+function drawFrame(sky, hour) {
+  ctx.setTransform(cfg.renderScale, 0, 0, cfg.renderScale, 0, 0);
+
+  /* --- Position du soleil et de la lune (arcs de cercle) --- */
+  const sunAng  = (hour - 6) / 13 * Math.PI;                  // lever 6h, coucher 19h
+  const moonAng = (((hour - 19) % 24 + 24) % 24) / 12 * Math.PI; // lever 19h, coucher 7h
+  const sunAlt  = Math.sin(sunAng), moonAlt = Math.sin(moonAng);
+  const sunX  = W * (0.5 - Math.cos(sunAng) * 0.38),  sunY  = HZ - sunAlt  * H * 0.50;
+  const moonX = W * (0.5 - Math.cos(moonAng) * 0.38), moonY = HZ - moonAlt * H * 0.46;
+
+  /* --- Ciel --- */
+  let g = ctx.createLinearGradient(0, 0, 0, HZ);
+  g.addColorStop(0, rgb(sky.top));
+  g.addColorStop(1, rgb(sky.hor));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, HZ + 2);
+
+  /* --- Étoiles (visibles seulement la nuit, scintillent doucement) --- */
+  if (sky.star > 0.01) {
+    for (const s of stars) {
+      const fade = 1 - clamp(s.y / HZ, 0, 1) * 0.8;           // moins visibles près de l'horizon
+      const a = sky.star * fade * (0.55 + 0.45 * Math.sin(T * s.sp + s.ph));
+      ctx.fillStyle = `rgba(255,255,240,${a.toFixed(3)})`;
+      ctx.fillRect(s.x, s.y, s.s, s.s);
+    }
+  }
+
+  /* --- Halo du soleil : intense à l'horizon, discret en plein jour --- */
+  const glowK = clamp((sunAlt + 0.35) / 0.35, 0, 1) * (1 - clamp(sunAlt, 0, 1) * 0.8);
+  if (glowK > 0.01) {
+    const gx = sunX, gy = Math.min(sunY, HZ);
+    g = ctx.createRadialGradient(gx, gy, 0, gx, gy, W * 0.55);
+    g.addColorStop(0, rgb(sky.glow, 0.75 * glowK));
+    g.addColorStop(0.35, rgb(sky.glow, 0.28 * glowK));
+    g.addColorStop(1, rgb(sky.glow, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, HZ + 2);
+  }
+
+  /* --- Soleil --- */
+  if (sunAlt > -0.12) {
+    const r = H * 0.032;
+    g = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, r * 5);
+    g.addColorStop(0, rgb(mix(sky.glow, [255, 255, 255], 0.6), 1));
+    g.addColorStop(0.2, rgb(sky.glow, 0.9));
+    g.addColorStop(1, rgb(sky.glow, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sunX, sunY, r * 5, 0, 6.2832); ctx.fill();
+  }
+
+  /* --- Lune : halo + disque + quelques cratères --- */
+  if (moonAlt > -0.12) {
+    const r = H * 0.028, vis = clamp(sky.star * 1.2, 0, 1);   // s'estompe en plein jour
+    g = ctx.createRadialGradient(moonX, moonY, r * 0.5, moonX, moonY, r * 7);
+    g.addColorStop(0, `rgba(190,210,255,${0.35 * vis})`);
+    g.addColorStop(1, 'rgba(190,210,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(moonX, moonY, r * 7, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = `rgba(236,240,255,${vis})`;
+    ctx.beginPath(); ctx.arc(moonX, moonY, r, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = `rgba(170,182,215,${0.5 * vis})`;
+    for (const [dx, dy, dr] of [[-0.3, -0.2, 0.22], [0.25, 0.1, 0.28], [-0.05, 0.4, 0.16]]) {
+      ctx.beginPath(); ctx.arc(moonX + dx * r, moonY + dy * r, dr * r, 0, 6.2832); ctx.fill();
+    }
+  }
+
+  /* --- Montagnes lointaines et moyennes (derrière les îles) --- */
+  const mtnFill = m => {
+    const c = mix(sky.sil, sky.hor, m.haze);
+    const gr = ctx.createLinearGradient(0, HZ - m.amp, 0, HZ);
+    gr.addColorStop(0, rgb(c));
+    gr.addColorStop(1, rgb(mix(c, sky.hor, 0.55)));          // la brume monte du lac
+    return gr;
+  };
+  for (let i = 0; i < 2; i++) { ctx.fillStyle = mtnFill(mountains[i]); ctx.fill(mountains[i].path); }
+
+  /* --- Îles flottantes --- */
+  for (const isl of islands) drawIsland(isl, sky);
+
+  /* --- Rive proche --- */
+  ctx.fillStyle = mtnFill(mountains[2]);
+  ctx.fill(mountains[2].path);
+
+  /* --- Lac --- */
+  const lakeTop = mix(sky.hor, sky.sil, 0.15), lakeBot = mix(sky.top, sky.sil, 0.55);
+  g = ctx.createLinearGradient(0, HZ, 0, H);
+  g.addColorStop(0, rgb(lakeTop));
+  g.addColorStop(1, rgb(lakeBot));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, HZ, W, H - HZ);
+
+  // Reflets des montagnes et des îles (retournés autour de l'horizon)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, HZ, W, H - HZ); ctx.clip();
+  ctx.translate(0, 2 * HZ); ctx.scale(1, -1);
+  ctx.globalAlpha = 0.38;
+  for (let i = 0; i < 3; i++) { ctx.fillStyle = mtnFill(mountains[i]); ctx.fill(mountains[i].path); }
+  ctx.globalAlpha = 0.34;
+  for (const isl of islands) drawIsland(isl, sky);
+  ctx.restore();
+
+  // Reflet du soleil / de la lune : traînée scintillante
+  const lightSrc = sunAlt > -0.05 && glowK + sunAlt > 0.02
+    ? { x: sunX, k: clamp(sunAlt * 3 + 0.4, 0, 1), c: mix(sky.glow, [255, 255, 255], 0.35), r: H * 0.03 }
+    : moonAlt > 0 ? { x: moonX, k: 0.55 * clamp(sky.star * 1.2, 0, 1), c: [200, 215, 255], r: H * 0.026 } : null;
+  if (lightSrc && lightSrc.k > 0.02) {
+    ctx.globalCompositeOperation = 'lighter';
+    const n = 44;
+    for (let i = 0; i < n; i++) {
+      const u = i / n, y = HZ + 3 + Math.pow(u, 1.7) * (H - HZ);
+      const w = lightSrc.r * (1.2 + u * 5) * (0.55 + 0.45 * Math.sin(T * 1.7 + i * 1.9));
+      const x = lightSrc.x + Math.sin(T * 0.9 + i * 2.3) * (4 + u * 14);
+      ctx.fillStyle = rgb(lightSrc.c, 0.38 * lightSrc.k * (1 - u * 0.65));
+      ctx.fillRect(x - w / 2, y, w, 1.5 + u * 2.5);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // Ondulations : lignes pointillées qui défilent lentement
+  const rip = mix(sky.hor, [255, 255, 255], 0.35);
+  for (let j = 0; j < 38; j++) {
+    const u = j / 38, y = HZ + 6 + u * u * (H - HZ - 6);
+    ctx.lineWidth = 0.8 + u * 2;
+    ctx.strokeStyle = rgb(rip, 0.07 + u * 0.05);
+    ctx.setLineDash([14 + u * 70, 40 + u * 170]);
+    ctx.lineDashOffset = -T * (6 + u * 26) * (j % 2 ? 1 : -1) + j * 41;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  /* --- Voile de brume à l'horizon (fond les montagnes dans le lac) --- */
+  const bh = H * 0.07;
+  g = ctx.createLinearGradient(0, HZ - bh, 0, HZ + bh);
+  g.addColorStop(0, rgb(sky.hor, 0));
+  g.addColorStop(0.5, rgb(sky.hor, 0.5));
+  g.addColorStop(1, rgb(sky.hor, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, HZ - bh, W, bh * 2);
+
+  /* --- Vignettage léger pour donner de la profondeur --- */
+  g = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.45, W / 2, H * 0.55, Math.max(W, H) * 0.75);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, `rgba(0,0,10,${0.28 + sky.star * 0.14})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// Dessine une île avec son flottement et le balancement des arbres
+function drawIsland(isl, sky) {
+  const amp  = cfg.floatAmp;
+  const bob  = Math.sin(T * isl.f + isl.ph) * isl.bobAmp * amp;           // haut / bas
+  const tilt = Math.sin(T * isl.f * 0.7 + isl.ph * 1.3) * 0.012 * amp;    // léger roulis
+
+  const col = mix(sky.sil, sky.hor, isl.haze);
+  ctx.save();
+  ctx.translate(isl.x, isl.y + bob);
+  ctx.rotate(tilt);
+  ctx.scale(isl.s, isl.s);
+
+  // Dégradé : surface nette, base du rocher fondue dans la brume
+  const gr = ctx.createLinearGradient(0, -30, 0, isl.depth);
+  gr.addColorStop(0, rgb(mix(col, sky.glow, 0.10)));
+  gr.addColorStop(0.4, rgb(col));
+  gr.addColorStop(1, rgb(mix(col, sky.hor, 0.45)));
+  ctx.fillStyle = gr;
+  ctx.fill(isl.body);
+  ctx.fill(isl.structs);
+
+  // Arbres : balancement léger (cisaillement horizontal qui croît avec la hauteur)
+  ctx.fillStyle = rgb(mix(col, sky.top, 0.06));
+  for (const t of isl.trees) {
+    const sway = Math.sin(T * 1.4 + t.ph + t.x * 0.1) * 0.05;
+    ctx.save();
+    ctx.translate(t.x, t.y + 0.5);
+    ctx.transform(t.sc, 0, sway * t.sc, t.sc, 0, 0);
+    ctx.fill(TREE);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* --------------------------------------------------------------------------
+   9. BOUCLE PRINCIPALE
+   -------------------------------------------------------------------------- */
+let last = 0, fpsAcc = 0, fpsCount = 0, fpsShown = 0;
+
+function frame(ms) {
+  requestAnimationFrame(frame);
+  if (ms - last < 1000 / cfg.fpsLimit - 2) return;        // limite de FPS (économie GPU/CPU)
+  const dt = Math.min((ms - last) / 1000, 0.1);
+  last = ms; T += dt;
+
+  updateHour(dt);
+  const sky = skyAt(hourShown);
+  drawFrame(sky, hourShown);
+
+  if (cfg.debug) {
+    fpsAcc += dt; fpsCount++;
+    if (fpsAcc > 0.5) { fpsShown = Math.round(fpsCount / fpsAcc); fpsAcc = 0; fpsCount = 0; }
+    const hh = Math.floor(hourShown), mm = Math.floor((hourShown % 1) * 60);
+    ctx.fillStyle = '#fff'; ctx.font = '16px monospace';
+    ctx.fillText(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}  ${fpsShown} fps`, 16, 28);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. PROPRIÉTÉS WALLPAPER ENGINE (définies dans project.json)
+   -------------------------------------------------------------------------- */
+window.wallpaperPropertyListener = {
+  applyUserProperties(p) {
+    if (p.cyclespeed) cfg.cycleSpeed = Number(p.cyclespeed.value) || 1;
+    if (p.testmode)   cfg.testMode   = !!p.testmode.value;
+    if (p.testhour)   cfg.testHour   = Number(p.testhour.value);
+    if (p.floatamp)   cfg.floatAmp   = Number(p.floatamp.value);
+    if (p.renderscale) { cfg.renderScale = clamp(Number(p.renderscale.value), 0.5, 1); resize(); }
+  },
+  applyGeneralProperties(p) {
+    if (p.fps) cfg.fpsLimit = p.fps;                       // réglage FPS global de Wallpaper Engine
+  }
+};
+
+window.addEventListener('resize', resize);
+resize();
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
