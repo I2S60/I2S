@@ -1,0 +1,28 @@
+{
+  "PropertyListener": "SucrosePropertyListener('{0}', {1});",
+  "PropertyList": {
+    "folder_time": { "type": "label", "value": "Heure et lune" },
+    "cyclespeed": { "type": "slider", "text": "Vitesse du cycle jour/nuit (1 = temps réel)", "min": 1, "max": 720, "step": 1, "value": 1 },
+    "testmode": { "type": "checkbox", "text": "Mode test : forcer l'heure", "value": false },
+    "testhour": { "type": "slider", "text": "Heure forcée (mode test)", "min": 0, "max": 24, "step": 0.1, "value": 19 },
+    "moonphase": { "type": "slider", "text": "Phase de la lune (-1 = automatique, 0.5 = pleine)", "min": -1, "max": 1, "step": 0.05, "value": -1 },
+
+    "folder_weather": { "type": "label", "value": "Météo" },
+    "weatherenabled": { "type": "checkbox", "text": "Activer la météo en temps réel", "value": true },
+    "autolocation": { "type": "checkbox", "text": "Localisation automatique (sinon, ville ci-dessous)", "value": true },
+    "city": { "type": "textbox", "text": "Ville manuelle (ex. Paris)", "value": "" },
+    "testweather": {
+      "type": "dropdown",
+      "text": "Mode test : forcer la météo",
+      "value": 0,
+      "items": ["Automatique (API Open-Meteo)", "Ciel dégagé", "Nuageux", "Brouillard", "Pluie", "Orage", "Neige", "Vent fort"]
+    },
+
+    "folder_render": { "type": "label", "value": "Ambiance et performances" },
+    "particles": { "type": "slider", "text": "Intensité des particules", "min": 0, "max": 2, "step": 0.1, "value": 1 },
+    "painted": { "type": "slider", "text": "Effet peinture (grain de toile)", "min": 0, "max": 1, "step": 0.05, "value": 0.7 },
+    "godrays": { "type": "slider", "text": "Rayons de lumière", "min": 0, "max": 1, "step": 0.05, "value": 0.6 },
+    "floatamp": { "type": "slider", "text": "Amplitude du flottement des îles", "min": 0, "max": 3, "step": 0.1, "value": 1 },
+    "renderscale": { "type": "slider", "text": "Résolution de rendu (baisser si ça rame)", "min": 0.5, "max": 1, "step": 0.05, "value": 1 }
+  }
+}

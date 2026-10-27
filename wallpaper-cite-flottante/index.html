@@ -1409,6 +1409,14 @@ window.wallpaperPropertyListener = {
   }
 };
 
+// Compatibilité Sucrose Wallpaper Engine : mêmes réglages, reçus via SucrosePropertyListener(nom, contrôle)
+const WX_TESTS = ['auto', 'clear', 'cloudy', 'fog', 'rain', 'storm', 'snow', 'wind'];   // même ordre que la liste déroulante
+window.SucrosePropertyListener = (name, val) => {
+  if (!val) return;
+  const v = name === 'testweather' ? (WX_TESTS[val.value | 0] || 'auto') : val.value;
+  window.wallpaperPropertyListener.applyUserProperties({ [name]: { value: v } });
+};
+
 window.addEventListener('resize', resize);
 resize();
 refreshWeather().then(() => {                          // ?weather=rain : applique l'état sans transition (tests)
