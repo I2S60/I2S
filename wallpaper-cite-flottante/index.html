@@ -1171,17 +1171,17 @@ const CLOTH = [[196, 62, 56], [60, 110, 180], [70, 140, 90], [205, 155, 60], [15
 function makeBeing(type, r) {
   const pick = a => a[(r() * a.length) | 0];
   const b = { type, x: -34 + r() * 68, dir: r() < 0.5 ? -1 : 1, v: 1.2, pause: r() * 4, ph: r() * 6.28, lo: -38, hi: 38,
-              sc: 1.35 * (0.92 + r() * 0.16), cloth: pick(CLOTH), hat: 0, carry: 0, lantern: false, run: false, t: 0 };
+              sc: 0.9 * (0.92 + r() * 0.16), cloth: pick(CLOTH), hat: 0, carry: 0, lantern: false, run: false, t: 0 };
   switch (type) {
     case 'villager': b.v = 1.1 + r() * 0.7; b.hat = (r() * 4) | 0; b.carry = (r() * 4) | 0; b.lantern = b.carry === 3; break;
     case 'guard':    b.v = 0.9 + r() * 0.2; b.cloth = pick([[60, 110, 180], [196, 62, 56]]); b.lantern = r() < 0.5; break;
     case 'wizard':   b.v = 0.6 + r() * 0.3; b.cloth = pick([[150, 90, 170], [60, 110, 180], [70, 140, 150]]); b.sc *= 1.05; break;
     case 'farmer':   b.v = 1.0 + r() * 0.4; b.cloth = pick([[120, 82, 52], [70, 140, 90], [205, 155, 60]]); break;
     case 'merchant': b.v = 0.8 + r() * 0.3; b.hat = 2; b.cloth = pick([[205, 155, 60], [70, 140, 90], [150, 90, 170]]); break;
-    case 'child':    b.v = 1.8 + r() * 0.8; b.sc = 0.85 * (0.92 + r() * 0.16); b.run = true; b.hat = 0; b.carry = 0; break;
+    case 'child':    b.v = 1.8 + r() * 0.8; b.sc = 0.58 * (0.92 + r() * 0.16); b.run = true; b.hat = 0; b.carry = 0; break;
     case 'monk':     b.v = 0.5 + r() * 0.3; b.cloth = [226, 140, 48]; b.sc *= 1.02; break;
-    case 'dog':      b.v = 2 + r() * 1.2; b.sc = 1.2; b.cloth = pick([[120, 82, 52], [60, 50, 44], [200, 170, 120]]); b.run = true; break;
-    case 'sheep':    b.v = 0.25 + r() * 0.15; b.sc = 1.2; b.cloth = [236, 232, 222]; break;
+    case 'dog':      b.v = 2 + r() * 1.2; b.sc = 0.8; b.cloth = pick([[120, 82, 52], [60, 50, 44], [200, 170, 120]]); b.run = true; break;
+    case 'sheep':    b.v = 0.25 + r() * 0.15; b.sc = 0.8; b.cloth = [236, 232, 222]; break;
   }
   return b;
 }
@@ -2048,11 +2048,11 @@ const MONSTER_ACTS = ['tailslap', 'lunge'];                            // compor
 // Chaque apparition dure 24 à 32 s : il émerge, nage en travers du lac, fait une claque de queue et un bond du cou
 // puis plonge en arche (aucun effet particulier au niveau de la tête)
 function spawnMonster() {
-  const f = 0.3 + crR() * 0.5, dir = crR() < 0.5 ? -1 : 1, travel = W * (0.12 + crR() * 0.12);
+  const f = crR(), dir = crR() < 0.5 ? -1 : 1, travel = W * (0.07 + crR() * 0.07);              // il évolue au second plan : trajet plus court
   const acts = MONSTER_ACTS.slice().sort(() => crR() - 0.5).slice(0, 3);
   monster = { active: true, t0: T, dur: 24 + crR() * 8, dir, travel,
               x: clamp((0.2 + crR() * 0.6) * W, W * 0.15 + (dir < 0 ? travel : 0), W * 0.85 - (dir > 0 ? travel : 0)),
-              y: HZ + (H - HZ) * (0.18 + f * 0.62), sc: U * (0.0014 + 0.0017 * f), ph: crR() * 6.28, wait: 0,
+              y: HZ + (H - HZ) * (0.07 + f * 0.15), sc: U * (0.0006 + 0.0005 * f), ph: crR() * 6.28, wait: 0,      // loin, près de l'horizon, et petit
               events: acts.map((kind, i) => ({ kind, u0: 0.28 + i * 0.3 + crR() * 0.04, du: 0.075 })) };
 }
 function updateMonster(dt) {
