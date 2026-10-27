@@ -61,6 +61,40 @@
         "fraction": true,
         "precision": 2
       },
+      "weatherenabled": {
+        "order": 7,
+        "text": "Activer la météo en temps réel",
+        "type": "bool",
+        "value": true
+      },
+      "autolocation": {
+        "order": 8,
+        "text": "Localisation automatique (sinon, ville ci-dessous)",
+        "type": "bool",
+        "value": true
+      },
+      "city": {
+        "order": 9,
+        "text": "Ville manuelle (ex. Paris)",
+        "type": "textinput",
+        "value": ""
+      },
+      "testweather": {
+        "order": 10,
+        "text": "Mode test : forcer la météo",
+        "type": "combo",
+        "value": "auto",
+        "options": [
+          { "label": "Automatique (API Open-Meteo)", "value": "auto" },
+          { "label": "Ciel dégagé", "value": "clear" },
+          { "label": "Nuageux", "value": "cloudy" },
+          { "label": "Brouillard", "value": "fog" },
+          { "label": "Pluie", "value": "rain" },
+          { "label": "Orage", "value": "storm" },
+          { "label": "Neige", "value": "snow" },
+          { "label": "Vent fort", "value": "wind" }
+        ]
+      },
       "renderscale": {
         "order": 6,
         "text": "Résolution de rendu (baisser si ça rame)",
