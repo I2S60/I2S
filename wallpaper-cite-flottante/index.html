@@ -29,6 +29,8 @@
 (() => {
 'use strict';
 
+const BUILD = 'v1.4';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
+
 /* --------------------------------------------------------------------------
    1. CONFIGURATION (modifiée par les propriétés de Wallpaper Engine)
    -------------------------------------------------------------------------- */
@@ -40,7 +42,7 @@ const cfg = {
   moonPhase:  -1,      // -1 = phase réelle du jour ; 0 à 1 = forcée (0 nouvelle, 0.5 pleine)
   particles:   1,      // intensité des particules (0 = aucune, 2 = maximum)
   painted:     0.7,    // force de l'effet « peinture » (grain de toile, coups de pinceau)
-  godRays:     0.6,    // intensité des rayons de lumière
+  godRays:     0.4,    // intensité des rayons de lumière
   showClock:   true,   // affiche l'heure à l'écran (désactivable dans les réglages)
   renderScale: 1,      // résolution interne (0.5 à 1)
   fpsLimit:    60,     // fournie par Wallpaper Engine (réglage « FPS » global)
@@ -628,9 +630,10 @@ function drawFrame(sky, hour) {
   // Des rayons n'existent que si le soleil est visible : ils s'effacent quand un nuage le recouvre
   // et disparaissent avec un ciel couvert, la pluie, le brouillard ou l'orage
   const sunRay = clamp((sunAlt + 0.1) / 0.15, 0, 1) * (0.4 + 0.6 * (1 - clamp(sunAlt, 0, 1))) *
-                 (1 - sunCover) * clamp(1 - wth.cloud * 1.15, 0, 1) *
+                 (1 - sunCover) * clamp(1 - wth.cloud * 2.2, 0, 1) *      // plus aucun rayon dès ~45 % de nuages
                  clamp(1 - wth.rain - wth.fog * 0.6 - wth.storm, 0, 1);
-  drawRays(sunX, Math.min(sunY, HZ), sunRay, sky.glow, H * 0.95);
+  rayK += (sunRay - rayK) * (1 - Math.exp(-frameDt * 2));                 // apparition / disparition en douceur
+  drawRays(sunX, Math.min(sunY, HZ), rayK, sky.glow, H * 0.95);
   if (moonAlt > 0) drawRays(moonX, moonY, 0.3 * clamp(sky.star * 1.2, 0, 1) * (1 - moonCover) * clamp(1 - wth.cloud * 1.15 - wth.rain, 0, 1), [190, 210, 255], H * 0.8);
 
   /* --- Voile de brume à l'horizon (fond les montagnes dans le lac) --- */
@@ -721,6 +724,7 @@ function drawIsland(isl, sky) {
 const CLEAR = { cloud: 0.1, rain: 0, snow: 0, fog: 0, storm: 0, wind: 0.15 };   // ciel de secours
 const PRESETS = {                                                               // pour le mode test
   clear:  CLEAR,
+  partly: { cloud: 0.35, rain: 0, snow: 0, fog: 0, storm: 0, wind: 0.2 },
   cloudy: { cloud: 0.9,  rain: 0,   snow: 0,   fog: 0,   storm: 0, wind: 0.3  },
   fog:    { cloud: 0.5,  rain: 0,   snow: 0,   fog: 1,   storm: 0, wind: 0.05 },
   rain:   { cloud: 0.95, rain: 0.7, snow: 0,   fog: 0.1, storm: 0, wind: 0.3  },
@@ -898,7 +902,7 @@ function drawClouds(sky) {
    Orage : éclairs + flash, pluie, neige, brouillard
    -------------------------------------------------------------------------- */
 let bolt = null, flash = 0, nextBolt = 4;
-const crR = rng(321);                                  // aléatoire reproductible (météo / créatures)
+const crR = rng((Date.now() ^ 0x5bd1e995) >>> 0);      // graine liée à l'heure de lancement : formations différentes à chaque fois
 const boltFlash = a => a < 0.07 ? 1 : a < 0.13 ? 0.2 : a < 0.22 ? 0.95 : Math.exp(-(a - 0.22) * 5);
 
 function spawnBolt() {
@@ -1106,25 +1110,42 @@ const mkGlow = (r, g, b) => {
 const JELLY_COLORS = [[120, 230, 255], [190, 140, 255], [140, 255, 190]];
 const JELLY_GLOWS = JELLY_COLORS.map(c => mkGlow(...c));
 
-function spawnFlock(f, onScreen) {
-  const dir = crR() < 0.5 ? -1 : 1;
-  const r = crR();
-  f.dir = dir; f.w = U * (0.0042 + crR() * 0.0035);
-  f.kind = r < 0.4 ? 'v' : r < 0.65 ? 'line' : 'swarm';               // V, échelon ou nuée
-  const n = f.kind === 'swarm' ? 14 + (crR() * 12 | 0) : 5 + (crR() * 7 | 0);
-  f.v = (30 + crR() * 35) * (U / 1920); f.y = (0.08 + crR() * 0.3) * H; f.ph = crR() * 6.28;
-  f.birds = Array.from({ length: n }, (_, i) => {
+// Positions des oiseaux (décalage derrière le meneur) pour un type de formation
+const FORMATIONS = ['v', 'line', 'row', 'ring', 'cluster', 'swarm'];
+function flockSlots(kind, n, w) {
+  return Array.from({ length: n }, (_, i) => {
+    const k = Math.ceil(i / 2), side = i % 2 ? 1 : -1;                 // k = rang derrière le meneur
     let ox, oy;
-    if (f.kind === 'swarm') { ox = (crR() - 0.5) * f.w * 16; oy = (crR() - 0.5) * f.w * 8; }
-    else {
-      const k = Math.ceil(i / 2), side = i % 2 ? 1 : -1;               // k = rang derrière le meneur
-      ox = k * f.w * 2.3 + (crR() - 0.5) * f.w * 0.5;
-      oy = (f.kind === 'v' ? side : 1) * k * f.w * 1.25 + (crR() - 0.5) * f.w * 0.4;
+    switch (kind) {
+      case 'v':    ox = k * w * 2.3; oy = side * k * w * 1.25; break;           // en V
+      case 'line': ox = k * w * 2.3; oy = k * w * 1.25; break;                  // en échelon (une diagonale)
+      case 'row':  ox = (i - n / 2) * w * 2.6; oy = Math.sin(i * 0.9) * w * 0.8; break;   // file ondulante
+      case 'ring': { const a = i / n * 6.283; ox = Math.cos(a) * w * n * 0.5; oy = Math.sin(a) * w * n * 0.3; break; } // ronde
+      case 'cluster': ox = (crR() - 0.5) * w * 10; oy = (crR() - 0.5) * w * 6; break;     // groupe serré
+      default:     ox = (crR() - 0.5) * w * 16; oy = (crR() - 0.5) * w * 8;               // nuée étalée
     }
-    // chaque oiseau a sa taille, sa cadence de battement et ses petites dérives
-    return { ox, oy, s: 0.75 + crR() * 0.5, ph: crR() * 6.28, rate: 5.5 + crR() * 3,
-             jx: crR() * 6.28, jy: crR() * 6.28, glide: crR() * 6.28 };
+    return { ox: ox + (crR() - 0.5) * w * 0.5, oy: oy + (crR() - 0.5) * w * 0.4 };
   });
+}
+// Chaque volée part d'une formation et se transforme lentement vers une autre (mélange A -> B),
+// avec sa propre taille, vitesse, altitude et nombre d'oiseaux : elles ne se ressemblent jamais
+function spawnFlock(f, onScreen) {
+  const dir = crR() < 0.5 ? -1 : 1, solo = crR() < 0.2;                // 1 volée sur 5 : un ou deux grands planeurs
+  f.dir = dir; f.w = U * (solo ? 0.009 + crR() * 0.004 : 0.0035 + crR() * 0.005);
+  const n = solo ? 1 + (crR() * 2 | 0) : 5 + (crR() * 17 | 0);
+  const kA = FORMATIONS[(crR() * FORMATIONS.length) | 0];
+  let kB = FORMATIONS[(crR() * FORMATIONS.length) | 0];
+  if (kB === kA) kB = FORMATIONS[(FORMATIONS.indexOf(kA) + 1 + ((crR() * 4) | 0)) % FORMATIONS.length];
+  f.kind = solo ? 'solo' : kA + '→' + kB;
+  f.mr = 0.04 + crR() * 0.08;                                          // vitesse de transformation (période 50 à 150 s)
+  f.v = (22 + crR() * 50) * (U / 1920); f.y = (0.07 + crR() * 0.34) * H; f.ph = crR() * 6.28;
+  f.glideBias = solo ? 1.2 : 0;                                        // les planeurs battent moins des ailes
+  const A = flockSlots(solo ? 'cluster' : kA, n, f.w), B = flockSlots(solo ? 'cluster' : kB, n, f.w);
+  f.birds = A.map((a, i) => ({                                         // chaque oiseau a sa taille, sa cadence et ses dérives
+    ax: a.ox, ay: a.oy, bx: B[i].ox, by: B[i].oy,
+    s: 0.75 + crR() * 0.5, ph: crR() * 6.28, rate: 5 + crR() * 3.5,
+    jx: crR() * 6.28, jy: crR() * 6.28, glide: crR() * 6.28
+  }));
   f.x = onScreen ? crR() * W : (dir > 0 ? -f.w * 20 : W + f.w * 20);
   f.active = true;
 }
@@ -1135,7 +1156,7 @@ function spawnDragon() {
   dragon.base = dragon.y;
 }
 function buildCreatures() {
-  flocks = Array.from({ length: 3 }, () => { const f = { wait: 0 }; spawnFlock(f, true); return f; });
+  flocks = Array.from({ length: 4 }, () => { const f = { wait: 0 }; spawnFlock(f, true); return f; });
   dragon = { active: false, wait: 10 };
   jellies = Array.from({ length: 7 }, () => ({
     x: crR() * W, y: (0.12 + crR() * 0.4) * H, s: U * (0.007 + crR() * 0.006),
@@ -1165,12 +1186,13 @@ function drawBirds(sky) {
     const cy = f.y + Math.sin(T * 0.25 + f.ph) * H * 0.025;           // le vol ondule doucement
     ctx.lineWidth = Math.max(1, f.w * 0.26);
     ctx.beginPath();
+    const m = smooth(0.5 + 0.5 * Math.sin(T * f.mr + f.ph));          // 0 = formation A, 1 = formation B
     for (const b of f.birds) {
       const w = f.w * b.s;
-      const bx = f.x - f.dir * b.ox + Math.sin(T * 0.6 + b.jx) * w * 0.6;   // dérive individuelle
-      const by = cy + b.oy + Math.sin(T * 0.8 + b.jy) * w * 0.5;
+      const bx = f.x - f.dir * lerp(b.ax, b.bx, m) + Math.sin(T * 0.6 + b.jx) * w * 0.6;   // dérive individuelle
+      const by = cy + lerp(b.ay, b.by, m) + Math.sin(T * 0.8 + b.jy) * w * 0.5;
       // alterne battements d'ailes et vol plané, chacun à son rythme
-      const gate = smooth(clamp(0.5 + 1.2 * Math.sin(T * 0.35 + b.glide), 0, 1));
+      const gate = smooth(clamp(0.5 - f.glideBias * 0.5 + 1.2 * Math.sin(T * 0.35 + b.glide), 0, 1));
       const fl = lerp(0.25, Math.sin(T * b.rate + b.ph), gate);
       ctx.moveTo(bx - w, by - fl * w * 0.55);
       ctx.quadraticCurveTo(bx - w * 0.45, by - fl * w * 0.85 - w * 0.3, bx, by);
@@ -1418,7 +1440,7 @@ buildStars = safe('build étoiles', buildStars);
 /* --------------------------------------------------------------------------
    9. BOUCLE PRINCIPALE
    -------------------------------------------------------------------------- */
-let last = 0, fpsAcc = 0, fpsCount = 0, fpsShown = 0, lampBase = 0;
+let last = 0, fpsAcc = 0, fpsCount = 0, fpsShown = 0, lampBase = 0, frameDt = 0, rayK = 0;
 let dateKey = -1, dateText = '';                       // date affichée (recalculée une fois par jour)
 
 function frame(ms) {
@@ -1433,6 +1455,7 @@ function frame(ms) {
     const sky = skyAt(hourShown);
     lampBase = clamp(sky.star / 0.6, 0, 1);              // éclairage décidé avant que la météo ne masque les étoiles
     applyWeather(sky);
+    frameDt = dt;
     drawFrame(sky, hourShown);
   } catch (e) { reportError(e, 'image'); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
 
@@ -1457,6 +1480,9 @@ function frame(ms) {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     ctx.font = `400 ${Math.round(big * 0.34)}px "Segoe UI", system-ui, sans-serif`;
     ctx.fillText(dateText, x, y + big * 1.05);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';                       // numéro de version : permet de vérifier la version chargée
+    ctx.font = `400 ${Math.round(big * 0.2)}px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillText(BUILD, x, y + big * 1.5);
     ctx.shadowBlur = 0; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   }
 

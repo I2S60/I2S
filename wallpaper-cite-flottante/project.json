@@ -87,7 +87,7 @@
         "order": 13,
         "text": "Rayons de lumière",
         "type": "slider",
-        "value": 0.6,
+        "value": 0.4,
         "min": 0,
         "max": 1,
         "step": 0.05,
