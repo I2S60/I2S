@@ -29,7 +29,8 @@
 (() => {
 'use strict';
 
-const BUILD = 'v1.6';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
+const BUILD = 'v1.7';
+const QS = new URLSearchParams(location.search);   // paramètres de test : ?dragon et ?monster font apparaître les créatures tout de suite   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
    1. CONFIGURATION (modifiée par les propriétés de Wallpaper Engine)
@@ -269,16 +270,17 @@ function buildMountains() {
    -------------------------------------------------------------------------- */
 // Largeur occupée (unités locales) par chaque type d'élément posé sur une île
 const WIDTH = { tree: 9, bush: 5, house: 9, longhouse: 14, tower: 6, keep: 15, chapel: 10, windmill: 9,
-                pagoda: 11, dome: 10, lighthouse: 7, stall: 6, obelisk: 3, fence: 9 };
+                pagoda: 11, dome: 10, lighthouse: 7, stall: 6, obelisk: 3, fence: 9,
+                townhouse: 7, hall: 16, rotunda: 11, silo: 9, cottage: 9, clocktower: 7, ruins: 12, gazebo: 8, barn: 14 };
 // Thèmes : éléments obligatoires, éléments de remplissage (poids), essences d'arbres (poids), nombre d'habitants
 const THEMES = {
-  castle:  { must: ['keep', 'tower', 'tower', 'chapel'], fill: { house: 3, tree: 2, stall: 1, bush: 1, obelisk: 0.5 }, trees: { round: 3, cypress: 1, cherry: 1.5, pine: 1 }, people: 4 },
-  village: { must: ['chapel', 'house', 'house'], fill: { house: 4, tree: 2, stall: 1.5, bush: 1, longhouse: 0.6 }, trees: { round: 2, pine: 2, cherry: 1, willow: 0.6 }, people: 3 },
-  farm:    { must: ['windmill', 'longhouse'], fill: { longhouse: 1, fence: 2, tree: 2, bush: 2, house: 1, windmill: 0.5 }, trees: { round: 3, willow: 1 }, people: 3 },
-  forest:  { must: [], fill: { tree: 6, bush: 2, house: 0.6 }, trees: { pine: 4, cypress: 2, round: 1, palm: 1.5 }, people: 1 },
-  light:   { must: ['lighthouse'], fill: { tree: 2, bush: 2, house: 1 }, trees: { pine: 2, round: 1, palm: 2 }, people: 1 },
-  temple:  { must: ['pagoda', 'pagoda'], fill: { tree: 3, stall: 1, obelisk: 1, bush: 1 }, trees: { cherry: 4, round: 1, pine: 1 }, people: 2 },
-  observ:  { must: ['dome', 'tower'], fill: { tree: 2, house: 1, bush: 1, obelisk: 1 }, trees: { pine: 3, cypress: 2 }, people: 1 }
+  castle:  { must: ['keep', 'tower', 'tower', 'chapel'], fill: { house: 2, townhouse: 2, hall: 1, tree: 2, stall: 1, bush: 1, obelisk: 0.5, clocktower: 0.6, gazebo: 0.4 }, trees: { round: 3, cypress: 1, cherry: 1.5, pine: 1 }, people: 4 },
+  village: { must: ['chapel', 'townhouse', 'house'], fill: { house: 3, townhouse: 2, cottage: 2, clocktower: 0.5, hall: 0.5, stall: 1.5, tree: 2, bush: 1, longhouse: 0.5 }, trees: { round: 2, pine: 2, cherry: 1, willow: 0.6 }, people: 3 },
+  farm:    { must: ['windmill', 'barn'], fill: { silo: 1.5, cottage: 1.5, longhouse: 1, fence: 2, tree: 2, bush: 2, house: 1, windmill: 0.4 }, trees: { round: 3, willow: 1 }, people: 3 },
+  forest:  { must: [], fill: { tree: 6, bush: 2, cottage: 0.8, ruins: 0.5, gazebo: 0.3 }, trees: { pine: 4, cypress: 2, round: 1, palm: 1.5 }, people: 1 },
+  light:   { must: ['lighthouse'], fill: { tree: 2, bush: 2, cottage: 1.2, house: 0.6 }, trees: { pine: 2, round: 1, palm: 2 }, people: 1 },
+  temple:  { must: ['pagoda', 'pagoda'], fill: { tree: 3, stall: 1, obelisk: 1, bush: 1, rotunda: 0.8, gazebo: 1, ruins: 0.5 }, trees: { cherry: 4, round: 1, pine: 1 }, people: 2 },
+  observ:  { must: ['dome', 'tower'], fill: { tree: 2, house: 1, bush: 1, obelisk: 1, rotunda: 0.8, clocktower: 0.4 }, trees: { pine: 3, cypress: 2 }, people: 1 }
 };
 // Tirage pondéré dans { clé: poids }
 function pickW(r, weights) {
@@ -334,7 +336,7 @@ function buildIslands() {
 
     // Peuplement
     const structs = new Path2D(), trees = [], bldgs = [], wins = [], lamps = [];
-    const anim = { mills: [], flags: [], chimneys: [], beacons: [] };
+    const anim = { mills: [], flags: [], chimneys: [], beacons: [], clocks: [] };
     // Fenêtres et lanternes : chacune a un seuil « thr » d'allumage, donc la ville
     // s'illumine petit à petit au fil du crépuscule, pas toutes d'un coup
     const addWins = (cx, y, w, h, cols, rows) => {
@@ -346,11 +348,24 @@ function buildIslands() {
     const flag = (x, y, len = 3.6) => { structs.rect(x - 0.2, y - 5, 0.4, 5.5); anim.flags.push({ x: x + 0.2, y: y - 5, len, ph: r() * 6.28 }); };
 
     const B = {
-      house(cx, y) {
-        const w = 6.5 + r() * 3, h = 6 + r() * 7, pk = 4.5 + r() * 2.5;
+      house(cx, y) {                                                      // maison : six formes de toit, annexe éventuelle
+        const w = 6.5 + r() * 3, h = 6 + r() * 7, pk = 4.5 + r() * 2.5, roof = (r() * 6) | 0;
         structs.rect(cx - w / 2, y - h, w, h + 2);
-        structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx + (r() < 0.3 ? w * 0.18 : 0), y - h - pk); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath();
-        if (r() < 0.55) chimney(cx + (r() < 0.5 ? -1 : 1) * w * 0.25, y - h - pk * 0.55);
+        switch (roof) {
+          case 0: structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx + (r() < 0.3 ? w * 0.18 : 0), y - h - pk); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath(); break;   // à deux pans
+          case 1: structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx - w / 2 + 1.6, y - h - pk * 0.7); structs.lineTo(cx + w / 2 - 1.6, y - h - pk * 0.7); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath(); break;   // en croupe
+          case 2: structs.rect(cx - w / 2 - 0.6, y - h - 1.2, w + 1.2, 1.4); for (let i = 0; i < 3; i++) structs.rect(cx - w / 2 - 0.6 + i * (w + 0.4) / 2.2, y - h - 2.4, (w + 1.2) / 4.4, 1.3); break;   // toit plat à créneaux
+          case 3: structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx - w / 2 - 1, y - h - pk * 0.35); structs.lineTo(cx + w / 2 + 1, y - h - pk * 0.9); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath(); break;   // à un pan
+          case 4: structs.moveTo(cx - w / 2 - 1, y - h); structs.ellipse(cx, y - h, w / 2 + 1, pk * 0.8, 0, Math.PI, Math.PI * 2); structs.closePath(); break;   // toit de chaume arrondi
+          default: structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx - w / 2 + 0.8, y - h - pk * 0.55); structs.lineTo(cx - w * 0.18, y - h - pk);
+                   structs.lineTo(cx + w * 0.18, y - h - pk); structs.lineTo(cx + w / 2 - 0.8, y - h - pk * 0.55); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath();   // mansardé
+        }
+        if (w < 7.8 && r() < 0.5) {                                                  // annexe basse accolée
+          const sd = r() < 0.5 ? -1 : 1, ax = cx + sd * (w / 2 + 1.3);
+          structs.rect(ax - 1.3, y - h * 0.5, 2.6, h * 0.5 + 2);
+          structs.moveTo(ax - 1.9, y - h * 0.5); structs.lineTo(ax, y - h * 0.5 - 2.2); structs.lineTo(ax + 1.9, y - h * 0.5); structs.closePath();
+        }
+        if (roof !== 4 && r() < 0.55) chimney(cx + (r() < 0.5 ? -1 : 1) * w * 0.25, y - h - (roof === 2 ? 1 : pk * 0.55));
         bldgs.push({ x: cx, y, w, h });
         addWins(cx, y, w, h, Math.max(1, Math.floor((w - 1) / 3.5)), h > 9 ? 2 : 1);
         addLamp(cx + w / 2 + 1.8, y - 3);
@@ -403,7 +418,6 @@ function buildIslands() {
         structs.moveTo(cx - 5.2, y - 6); structs.lineTo(cx - 1.1, y - 10.5); structs.lineTo(cx + 3, y - 6); structs.closePath();
         structs.rect(cx + 1.4, y - 15, 3, 17);
         structs.moveTo(cx + 0.6, y - 15); structs.lineTo(cx + 2.9, y - 20.5); structs.lineTo(cx + 5.2, y - 15); structs.closePath();
-        structs.rect(cx + 2.65, y - 24, 0.5, 3.8); structs.rect(cx + 1.7, y - 23, 2.4, 0.5);
         bldgs.push({ x: cx, y, w: 9, h: 6 });
         addWins(cx - 1, y, 6, 6, 2, 1);
         addLamp(cx + 5.8, y - 3); addLamp(cx + 2.9, y - 12);
@@ -452,6 +466,95 @@ function buildIslands() {
         bldgs.push({ x: cx, y, w: 6, h: 36 });
         addWins(cx, y, 3.6, 20, 1, 2);
         addLamp(cx, y - 29.4);
+      },
+      townhouse(cx, y) {                                                  // maison de ville étroite à pignon à gradins
+        const w = 5 + r() * 1.5, h = 12 + r() * 5, st = 3, L = [[cx - w / 2, y - h]];
+        for (let i = 0; i < st; i++) {
+          const xa = cx - w / 2 + i * (w / 2) / st, xb = cx - w / 2 + (i + 1) * (w / 2) / st, ya = y - h - (i + 1) * 1.7;
+          L.push([xa, ya], [xb, ya]);
+        }
+        const R = L.slice(0, -1).reverse().map(([px, py]) => [2 * cx - px, py]);
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        L.concat(R).forEach(([px, py], i) => i ? structs.lineTo(px, py) : structs.moveTo(px, py));
+        structs.closePath();
+        bldgs.push({ x: cx, y, w, h });
+        addWins(cx, y, w, h, w > 5.8 ? 2 : 1, Math.max(2, Math.floor(h / 4.2)));
+        addLamp(cx + w / 2 + 1.5, y - 3);
+      },
+      hall(cx, y) {                                                       // grand hall : nef centrale haute et deux ailes
+        const cw = 6, ww = 4.6, ch = 10 + r() * 2, wh = 6 + r() * 1.5;
+        structs.rect(cx - cw / 2, y - ch, cw, ch + 2);
+        structs.moveTo(cx - cw / 2 - 0.8, y - ch); structs.lineTo(cx, y - ch - 5); structs.lineTo(cx + cw / 2 + 0.8, y - ch); structs.closePath();
+        for (const sx of [-1, 1]) {
+          const wx = cx + sx * (cw / 2 + ww / 2 - 0.2);
+          structs.rect(wx - ww / 2, y - wh, ww, wh + 2);
+          structs.moveTo(wx - ww / 2 - 0.6, y - wh); structs.lineTo(wx, y - wh - 2.8); structs.lineTo(wx + ww / 2 + 0.6, y - wh); structs.closePath();
+          addWins(wx, y, ww, wh, 1, 1);
+        }
+        if (r() < 0.6) chimney(cx + (r() < 0.5 ? -1 : 1) * 1.6, y - ch - 2.4);
+        bldgs.push({ x: cx, y, w: 15, h: ch });
+        addWins(cx, y, cw, ch, 2, 2);
+        addLamp(cx, y - 3);
+      },
+      rotunda(cx, y) {                                                    // rotonde à dôme et lanternon
+        structs.rect(cx - 5, y - 0.8, 10, 2.8);
+        structs.rect(cx - 4, y - 6, 8, 6);
+        structs.moveTo(cx - 4.5, y - 6); structs.ellipse(cx, y - 6, 4.5, 4.2, 0, Math.PI, Math.PI * 2); structs.closePath();
+        structs.rect(cx - 0.7, y - 11.6, 1.4, 1.8);
+        structs.moveTo(cx - 1.1, y - 11.6); structs.lineTo(cx, y - 13.6); structs.lineTo(cx + 1.1, y - 11.6); structs.closePath();
+        bldgs.push({ x: cx, y, w: 8, h: 10 });
+        addWins(cx, y, 8, 6, 3, 1);
+        addLamp(cx - 5.6, y - 2); addLamp(cx + 5.6, y - 2);
+      },
+      silo(cx, y) {                                                       // deux silos reliés par une conduite
+        for (const sx of [cx - 2.6, cx + 2.6]) {
+          structs.rect(sx - 1.8, y - 11, 3.6, 13);
+          structs.moveTo(sx - 2.2, y - 11); structs.lineTo(sx, y - 14.6); structs.lineTo(sx + 2.2, y - 11); structs.closePath();
+        }
+        structs.rect(cx - 2.6, y - 9, 5.2, 0.5);
+        bldgs.push({ x: cx, y, w: 9, h: 11 });
+        addLamp(cx, y - 3);
+      },
+      cottage(cx, y) {                                                    // chaumière : toit de chaume bombé
+        structs.rect(cx - 3.6, y - 4.5, 7.2, 6.5);
+        structs.moveTo(cx - 4.8, y - 4.5); structs.ellipse(cx, y - 4.5, 4.8, 3.4, 0, Math.PI, Math.PI * 2); structs.closePath();
+        if (r() < 0.7) chimney(cx + 2, y - 7);
+        bldgs.push({ x: cx, y, w: 7, h: 6 });
+        addWins(cx, y, 7.2, 5.5, 2, 1);
+        addLamp(cx + 4.8, y - 2.6);
+      },
+      clocktower(cx, y) {                                                 // tour de l'horloge : cadran qui indique l'heure
+        const w = 5, h = 20 + r() * 6;
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        structs.rect(cx - w / 2 - 0.5, y - h - 4, w + 1, 4);
+        structs.moveTo(cx - w / 2 - 1.2, y - h - 4); structs.lineTo(cx, y - h - 11); structs.lineTo(cx + w / 2 + 1.2, y - h - 4); structs.closePath();
+        anim.clocks.push({ x: cx, y: y - h + 4.6 });
+        bldgs.push({ x: cx, y, w, h });
+        addWins(cx, y, w, h - 8, 1, Math.max(1, Math.floor((h - 8) / 6)));
+        addLamp(cx, y - h - 11.5);
+      },
+      ruins(cx, y) {                                                      // ruines : colonnes brisées et bloc effondré
+        for (let i = 0; i < 4; i++) {
+          const xi = cx - 5 + i * 3.2, hi = 3 + r() * 6;
+          structs.rect(xi - 0.7, y - hi, 1.4, hi + 2);
+          if (r() < 0.6) structs.rect(xi - 1, y - hi - 0.6, 2, 0.7);
+        }
+        structs.rect(cx + 5, y - 1.2, 2.4, 1.6);
+      },
+      gazebo(cx, y) {                                                     // kiosque à toit conique
+        structs.rect(cx - 3.2, y - 4.5, 0.5, 4.8); structs.rect(cx + 2.7, y - 4.5, 0.5, 4.8);
+        structs.rect(cx - 3.8, y - 0.3, 7.6, 0.8);
+        structs.moveTo(cx - 4.4, y - 4.5); structs.lineTo(cx, y - 8.6); structs.lineTo(cx + 4.4, y - 4.5); structs.closePath();
+        addLamp(cx, y - 3.8);
+      },
+      barn(cx, y) {                                                       // grange à toit mansardé
+        const w = 13 + r(), h = 7;
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx - w / 2 + 1.2, y - h - 3.2); structs.lineTo(cx, y - h - 5);
+        structs.lineTo(cx + w / 2 - 1.2, y - h - 3.2); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath();
+        bldgs.push({ x: cx, y, w, h });
+        addWins(cx, y, w, h, 2, 1);
+        addLamp(cx - w / 2 - 1.6, y - 3);
       },
       stall(cx, y) {                                                      // étal de marché sous auvent
         structs.rect(cx - 2.2, y - 3, 0.4, 3.2); structs.rect(cx + 1.8, y - 3, 0.4, 3.2);
@@ -784,7 +887,11 @@ function drawFrame(sky, hour) {
   ctx.fill(mountains[2].path);
 
   /* --- Lac --- */
-  const lakeTop = mix(sky.hor, sky.sil, 0.15), lakeBot = mix(sky.top, sky.sil, 0.55);
+  // Eau franchement bleue (turquoise le jour, bleu nuit la nuit) : la teinte de l'eau prend le dessus sur celle du ciel,
+  // sauf sous les nuages et le brouillard où elle redevient plus terne
+  const dayW = clamp(1 - sky.star, 0, 1), wk = 0.62 * (1 - 0.45 * wth.cloud - 0.3 * wth.fog);
+  const lakeTop = mix(sky.hor, mix([16, 46, 92], [52, 150, 200], dayW), wk);
+  const lakeBot = mix(sky.top, mix([6, 20, 56], [14, 76, 146], dayW), wk + 0.12);
   g = ctx.createLinearGradient(0, HZ, 0, H);
   g.addColorStop(0, rgb(lakeTop));
   g.addColorStop(1, rgb(lakeBot));
@@ -833,6 +940,7 @@ function drawFrame(sky, hour) {
 
   /* --- Barques, sillages et reflets --- */
   drawBoats(sky);
+  drawMonster(sky);
 
   /* --- Particules d'ambiance et rayons de lumière --- */
   drawParticles(sky);
@@ -1002,6 +1110,19 @@ function drawIslandLife(isl, sky, col, dayK, dim) {
     for (let i = 1; i <= n; i++) { const u = i / n; ctx.lineTo(f.x + u * f.len, f.y + Math.sin(flagPh + u * 4 + f.ph) * amp * u); }
     for (let i = n; i >= 0; i--) { const u = i / n; ctx.lineTo(f.x + u * f.len, f.y + 1.8 * (1 - u * 0.25) + Math.sin(flagPh + u * 4 + f.ph) * amp * u); }
     ctx.fill();
+  }
+
+  // Horloges : cadran pâle le jour, éclairé la nuit, aiguilles réglées sur l'heure affichée
+  for (const c of A.clocks) {
+    const on = clamp((lamp - 0.1) * 3, 0, 1);
+    ctx.fillStyle = rgb(mix(mix(col, [238, 232, 212], 0.55 * dayK), [255, 205, 120], on));
+    ctx.beginPath(); ctx.arc(c.x, c.y, 1.9, 0, 6.2832); ctx.fill();
+    const ah = (hourShown % 12) / 12 * 6.2832 - 1.5708, am = (hourShown % 1) * 6.2832 - 1.5708;
+    ctx.strokeStyle = rgb(mix(col, [20, 20, 30], 0.6)); ctx.lineWidth = 0.28;
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + Math.cos(ah) * 0.95, c.y + Math.sin(ah) * 0.95);
+    ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + Math.cos(am) * 1.45, c.y + Math.sin(am) * 1.45);
+    ctx.stroke();
   }
 
   // Fumée des cheminées : volutes grises qui montent et dérivent avec le vent
@@ -1354,27 +1475,64 @@ function drawFog(sky) {
 let fogWisps = [];
 
 /* ==========================================================================
-   8c. BARQUES SUR LE LAC
+   8c. BATEAUX SUR LE LAC (6 types) ET MONSTRE MARIN
    ========================================================================== */
-const HULL = new Path2D();
-HULL.moveTo(-10, -2); HULL.lineTo(11, -3.2); HULL.quadraticCurveTo(8, 2, 0, 2.4); HULL.quadraticCurveTo(-7, 2, -10, -2); HULL.closePath();
-const MAST = new Path2D(); MAST.rect(-0.3, -17, 0.6, 15);
-// Voilier : grand-voile vers l'arrière (gauche) et foc vers l'avant (droite, côté de la proue)
-const SAIL = new Path2D(); SAIL.moveTo(-0.9, -16.5); SAIL.quadraticCurveTo(-7, -10, -8.5, -3.6); SAIL.lineTo(-0.9, -3.6); SAIL.closePath();
-const JIB  = new Path2D(); JIB.moveTo(0.9, -15);  JIB.quadraticCurveTo(5.5, -9, 9, -3.8); JIB.lineTo(0.9, -3.8); JIB.closePath();
-// Voilier à voile latine : mât court, grande voile triangulaire sur une vergue oblique
-const MAST2  = new Path2D(); MAST2.rect(0.3, -15, 0.5, 13);
-const LATEEN = new Path2D(); LATEEN.moveTo(0.8, -18.5); LATEEN.quadraticCurveTo(-1, -10, -9.5, -4.2); LATEEN.lineTo(8.5, -4.2); LATEEN.closePath();
-const YARD   = new Path2D(); YARD.moveTo(-9.8, -4.1); YARD.lineTo(0.8, -18.8);
-const CABIN = new Path2D(); CABIN.rect(-6.5, -5.2, 4.2, 2.8);
+const mkPath = f => { const p = new Path2D(); f(p); return p; };
+// Type 0 : voilier (grand-voile à l'arrière, foc à l'avant) — la proue est à droite
+const HULL = mkPath(p => { p.moveTo(-10, -2); p.lineTo(11, -3.2); p.quadraticCurveTo(8, 2, 0, 2.4); p.quadraticCurveTo(-7, 2, -10, -2); p.closePath(); });
+const MAST = mkPath(p => p.rect(-0.3, -17, 0.6, 15));
+const SAIL = mkPath(p => { p.moveTo(-0.9, -16.5); p.quadraticCurveTo(-7, -10, -8.5, -3.6); p.lineTo(-0.9, -3.6); p.closePath(); });
+const JIB  = mkPath(p => { p.moveTo(0.9, -15); p.quadraticCurveTo(5.5, -9, 9, -3.8); p.lineTo(0.9, -3.8); p.closePath(); });
+const CABIN = mkPath(p => p.rect(-6.5, -5.2, 4.2, 2.8));
+// Type 1 : voilier à voile latine (grande voile triangulaire sur vergue oblique)
+const MAST2  = mkPath(p => p.rect(0.3, -15, 0.5, 13));
+const LATEEN = mkPath(p => { p.moveTo(0.8, -18.5); p.quadraticCurveTo(-1, -10, -9.5, -4.2); p.lineTo(8.5, -4.2); p.closePath(); });
+const YARD   = mkPath(p => { p.moveTo(-9.8, -4.1); p.lineTo(0.8, -18.8); });
+// Type 2 : galion à trois mâts, voiles carrées, château arrière et beaupré
+const GAL_MAST = [[-6.5, -19], [0, -25], [6.5, -20]];
+const HULL_G = mkPath(p => {
+  p.moveTo(-12, -6.2); p.lineTo(-9, -6.2); p.lineTo(-8.4, -3.5); p.lineTo(10, -3.9); p.lineTo(13, -5.6);
+  p.quadraticCurveTo(11, 2.4, 0, 2.8); p.quadraticCurveTo(-9, 2.6, -12, -3); p.closePath();
+});
+const G_MASTS = mkPath(p => {
+  for (const [x, top] of GAL_MAST) {
+    p.rect(x - 0.3, top, 0.6, -top - 3);
+    p.moveTo(x + 0.3, top); p.lineTo(x + 3.2, top + 0.9); p.lineTo(x + 0.3, top + 1.8); p.closePath();   // fanion
+  }
+  p.moveTo(12, -5); p.lineTo(17, -8); p.lineTo(17, -7.4); p.lineTo(12, -4.4); p.closePath();               // beaupré
+});
+const G_SAILS = mkPath(p => { for (const [x, top] of GAL_MAST) { p.rect(x - 3.2, top + 2.2, 6.4, 6); p.rect(x - 3.8, top + 9, 7.6, 6.2); } });
+// Type 3 : barque à rames avec rameur et lanterne sur perche
+const HULL_R = mkPath(p => { p.moveTo(-7, -1.8); p.lineTo(8, -2.6); p.quadraticCurveTo(5, 1.6, 0, 1.8); p.quadraticCurveTo(-5, 1.6, -7, -1.8); p.closePath(); });
+const ROWER  = mkPath(p => { p.rect(-2, -5.8, 1.6, 4); ell(p, -1.2, -6.6, 0.9, 0.9); p.rect(6.2, -9, 0.5, 7); });
+// Type 4 : gondole effilée, gondolier debout à l'arrière, petite cabine
+const HULL_Q = mkPath(p => {
+  p.moveTo(-15, -5.2); p.quadraticCurveTo(-10, -1.5, -6, -1.6); p.lineTo(8, -1.6); p.quadraticCurveTo(13, -1.5, 16, -6.2);
+  p.quadraticCurveTo(10, 1.4, 0, 1.5); p.quadraticCurveTo(-10, 1.4, -15, -5.2); p.closePath();
+});
+const FELZE = mkPath(p => { p.rect(-1.5, -4.2, 5.6, 2.8); p.moveTo(-1.5, -4.2); p.ellipse(1.3, -4.2, 2.8, 1.6, 0, Math.PI, Math.PI * 2); p.closePath(); });
+const GONDOLIER = mkPath(p => { p.rect(-9.4, -9, 1.1, 7.4); ell(p, -8.85, -9.9, 0.8, 0.8); });
+// Type 5 : péniche chargée de caisses, avec cabine et cheminée qui fume
+const HULL_B = mkPath(p => { p.moveTo(-11, -2.4); p.lineTo(12, -2.4); p.lineTo(10.5, 2.2); p.lineTo(-9.8, 2.2); p.closePath(); });
+const CARGO = mkPath(p => {
+  p.rect(-8, -5.8, 5, 3.4); p.rect(-2.4, -5, 4, 2.6); p.rect(2.2, -6.4, 5, 4); p.rect(8, -6.4, 3.4, 4);
+  p.moveTo(7.6, -6.4); p.lineTo(9.7, -8.2); p.lineTo(11.8, -6.4); p.closePath(); p.rect(9.2, -10.2, 1, 3.2);
+});
+const BOAT_SCALE = [1, 1, 1.5, 0.9, 1.1, 1.2];            // taille relative de chaque type
+const BOAT_SPEED = [1, 1, 0.7, 0.8, 0.7, 0.5];            // vitesse relative
+const BOAT_HALF  = [10, 10, 12, 7, 15, 11];               // demi-longueur (position de la poupe)
+const BOAT_LAMPS = [                                       // lanternes de chaque type
+  [[0, -17.6], [-4.4, -5.8]], [[0.8, -19.2], [-4.4, -5.8]], [[-10.6, -7.2], [13.2, -6], [0, -25.6]],
+  [[6.4, -9.8], [-4, -3]], [[15.6, -6.9], [1.3, -6.4]], [[11, -7.2], [-8.6, -6.6]]
+];
 let boats = [];
 
 function buildBoats() {
   const r = rng(2024);
-  // u = profondeur sur le lac (0 = loin, 1 = proche) ; kind : 0 = voilier (grand-voile + foc), 1 = voile latine
-  boats = [[0.05, 0], [0.22, 1], [0.40, 1], [0.62, 0], [0.85, 1], [0.95, 0]].map(([u, kind]) => ({
-    u, kind, sc: U * (0.0007 + 0.0017 * u), dir: r() < 0.5 ? -1 : 1,
-    x: r() * W, y: HZ + (H - HZ) * (0.1 + 0.8 * u), v: (5 + 20 * u) * (U / 1920), ph: r() * 6.28
+  // u = profondeur sur le lac (0 = loin, 1 = proche) ; kind = type de bateau
+  boats = [[0.05, 0], [0.14, 2], [0.26, 1], [0.38, 4], [0.52, 3], [0.66, 0], [0.80, 5], [0.93, 1]].map(([u, kind]) => ({
+    u, kind, sc: U * (0.0007 + 0.0017 * u) * BOAT_SCALE[kind], dir: r() < 0.5 ? -1 : 1,
+    x: r() * W, y: HZ + (H - HZ) * (0.1 + 0.8 * u), v: (5 + 20 * u) * (U / 1920) * BOAT_SPEED[kind], ph: r() * 6.28
   }));
 }
 function updateBoats(dt) {
@@ -1385,22 +1543,49 @@ function updateBoats(dt) {
   }
 }
 function boatShape(b, hull, sail) {
-  ctx.fillStyle = rgb(hull); ctx.fill(HULL); ctx.fill(CABIN);
-  const billow = 1 + 0.035 * Math.sin(T * 1.3 + b.ph);              // la voile gonfle légèrement dans le vent
-  if (b.kind === 0) {
-    ctx.fill(MAST);
-    ctx.fillStyle = rgb(sail);
-    ctx.save(); ctx.scale(billow, 1); ctx.fill(SAIL); ctx.fill(JIB); ctx.restore();
-  } else {
-    ctx.fill(MAST2);
-    ctx.fillStyle = rgb(sail);
-    ctx.save(); ctx.scale(billow, 1); ctx.fill(LATEEN); ctx.restore();
-    ctx.strokeStyle = rgb(hull); ctx.lineWidth = 0.6; ctx.stroke(YARD);
+  const billow = 1 + 0.035 * Math.sin(T * 1.3 + b.ph);              // les voiles gonflent légèrement
+  ctx.fillStyle = rgb(hull);
+  switch (b.kind) {
+    case 0:
+      ctx.fill(HULL); ctx.fill(CABIN); ctx.fill(MAST);
+      ctx.fillStyle = rgb(sail); ctx.save(); ctx.scale(billow, 1); ctx.fill(SAIL); ctx.fill(JIB); ctx.restore();
+      break;
+    case 1:
+      ctx.fill(HULL); ctx.fill(CABIN); ctx.fill(MAST2);
+      ctx.fillStyle = rgb(sail); ctx.save(); ctx.scale(billow, 1); ctx.fill(LATEEN); ctx.restore();
+      ctx.strokeStyle = rgb(hull); ctx.lineWidth = 0.6; ctx.stroke(YARD);
+      break;
+    case 2:
+      ctx.fill(HULL_G); ctx.fill(G_MASTS);
+      ctx.fillStyle = rgb(sail); ctx.save(); ctx.scale(billow, 1); ctx.fill(G_SAILS); ctx.restore();
+      break;
+    case 3: {
+      ctx.fill(HULL_R); ctx.fill(ROWER);
+      ctx.strokeStyle = rgb(hull); ctx.lineWidth = 0.5;               // rames qui battent
+      const a = 0.9 + 0.35 * Math.sin(T * 2.2 + b.ph);
+      ctx.beginPath();
+      ctx.moveTo(-0.6, -2.6); ctx.lineTo(-0.6 + 5 * Math.cos(a), -2.6 + 5 * Math.sin(a));
+      ctx.moveTo(0.4, -2.6); ctx.lineTo(0.4 + 5 * Math.cos(a + 0.28), -2.6 + 5 * Math.sin(a + 0.28));
+      ctx.stroke();
+      break; }
+    case 4: {
+      ctx.fill(HULL_Q); ctx.fill(FELZE); ctx.fill(GONDOLIER);
+      ctx.strokeStyle = rgb(hull); ctx.lineWidth = 0.45;              // perche du gondolier
+      ctx.beginPath(); ctx.moveTo(-8.6, -7.8); ctx.lineTo(-5.6 + 0.8 * Math.sin(T * 1.1 + b.ph), 2.8); ctx.stroke();
+      break; }
+    default: {
+      ctx.fill(HULL_B); ctx.fill(CARGO);
+      const smoke = mix(hull, [205, 208, 218], 0.5);                  // fumée de la cheminée
+      for (let i = 0; i < 4; i++) {
+        const u = (T * 0.25 + i / 4 + b.ph) % 1;
+        ctx.fillStyle = rgb(smoke, (1 - u) * 0.4);
+        ctx.beginPath(); ctx.arc(9.7 + Math.sin(u * 6 + i) * 0.8 + windK * u * 6, -10.6 - u * 9, 0.8 + u * 2, 0, 6.2832); ctx.fill();
+      }
+    }
   }
 }
 function boatLamps(b, a) {
-  const lamps = b.kind === 0 ? [[0, -17.6], [-4.4, -5.8]] : [[0.8, -19.2], [-4.4, -5.8]];
-  lamps.forEach((l, i) => glow(l[0], l[1], 12, a * (0.85 + 0.15 * Math.sin(T * (4 + i) + b.ph * 7))));
+  BOAT_LAMPS[b.kind].forEach((l, i) => glow(l[0], l[1], 12, a * (0.85 + 0.15 * Math.sin(T * (4 + i) + b.ph * 7))));
 }
 function drawBoats(sky) {
   const hull = mix(sky.sil, sky.top, 0.08);
@@ -1409,7 +1594,8 @@ function drawBoats(sky) {
   for (const b of boats) {
     const bob = Math.sin(T * 1.1 + b.ph) * 0.5 * b.sc * (1 + windK);
     const tilt = Math.sin(T * 0.9 + b.ph) * 0.03 * (1 + windK * 2);
-    const wy = b.y + bob, sx = b.x - b.dir * 10 * b.sc, L = b.sc * 75, sp = b.sc * 13, wl = wy + b.sc * 1.6;
+    const half = BOAT_HALF[b.kind];
+    const wy = b.y + bob, sx = b.x - b.dir * half * b.sc, L = b.sc * 75, sp = b.sc * 13, wl = wy + b.sc * 1.6;
     // Sillage : deux branches en V + mousse centrale pointillée
     const g = ctx.createLinearGradient(sx, 0, sx - b.dir * L, 0);
     g.addColorStop(0, rgb(foam, 0.4)); g.addColorStop(1, rgb(foam, 0));
@@ -1421,7 +1607,7 @@ function drawBoats(sky) {
     ctx.setLineDash([b.sc * 5, b.sc * 7]); ctx.lineDashOffset = -T * b.sc * 6 * b.dir;
     ctx.beginPath(); ctx.moveTo(sx, wl + b.sc * 0.3); ctx.lineTo(sx - b.dir * L * 0.7, wl + b.sc * 0.3); ctx.stroke();
     ctx.setLineDash([]);
-    // Barque
+    // Bateau
     ctx.save();
     ctx.translate(b.x, wy); ctx.rotate(tilt); ctx.scale(b.dir * b.sc, b.sc);
     boatShape(b, hull, sail); boatLamps(b, lamp);
@@ -1431,6 +1617,88 @@ function drawBoats(sky) {
     ctx.translate(b.x, wy + b.sc * 0.5); ctx.scale(b.dir * b.sc, -b.sc * 0.9);
     ctx.globalAlpha = 0.3; boatShape(b, hull, sail); boatLamps(b, lamp * 0.8);
     ctx.restore();
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Monstre marin : un serpent de lac sort parfois de l'eau (cou, tête, bosses du dos),
+   puis replonge dans les remous. Il revient toutes les 35 à 80 secondes.
+   -------------------------------------------------------------------------- */
+let monster = { active: false, wait: QS.has('monster') ? 0.2 : 14 };
+function spawnMonster() {
+  const f = 0.3 + crR() * 0.55;                                       // profondeur sur le lac
+  monster = { active: true, t0: T, dur: 9 + crR() * 3, dir: crR() < 0.5 ? -1 : 1, x: (0.15 + crR() * 0.7) * W,
+              y: HZ + (H - HZ) * (0.18 + f * 0.65), sc: U * (0.0014 + 0.0017 * f), ph: crR() * 6.28, wait: 0 };
+}
+function updateMonster(dt) {
+  if (monster.active) { if (T - monster.t0 > monster.dur) { monster.active = false; monster.wait = 35 + crR() * 45; } }
+  else if ((monster.wait -= dt) <= 0) spawnMonster();
+}
+function drawMonster(sky) {
+  const m = monster;
+  if (!m.active) return;
+  const u = (T - m.t0) / m.dur;
+  const env = smooth(Math.min(1, u / 0.22)) * smooth(Math.min(1, (1 - u) / 0.22));   // sort puis replonge
+  if (env < 0.01) return;
+  const sc = m.sc, dir = m.dir, wy = m.y, x0 = m.x;
+  const dayK = clamp(1 - sky.star, 0, 1);
+  const col = mix(mix(sky.sil, [30, 72, 82], 0.3), sky.hor, 0.08 * dayK);
+  const sway = Math.sin(T * 0.9 + m.ph) * sc * 2;
+  // cou : courbe de Bézier du point d'immersion jusqu'à la tête
+  const Hn = 24 * sc * env, hx = x0 + dir * 9 * sc * (0.5 + 0.5 * env) + sway, hy = wy - Hn;
+  const cx = x0 - dir * 6 * sc, cy = wy - Hn * 0.7;
+  const nb = t => [(1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * hx, (1 - t) * (1 - t) * wy + 2 * (1 - t) * t * cy + t * t * hy];
+
+  const body = () => {
+    ctx.fillStyle = rgb(col); ctx.strokeStyle = rgb(col); ctx.lineCap = 'round';
+    for (let i = 0; i < 16; i++) {                                    // cou effilé
+      const a = nb(i / 16), b = nb((i + 1) / 16);
+      ctx.lineWidth = sc * (5.4 - 3.1 * i / 16);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.ellipse(hx + dir * sc * 0.6, hy, sc * 3, sc * 1.9, dir * 0.25, 0, 6.2832); ctx.fill();            // tête
+    ctx.beginPath(); ctx.ellipse(hx + dir * sc * 3, hy + sc * 0.6, sc * 2.1, sc * 1.2, dir * 0.15, 0, 6.2832); ctx.fill(); // museau
+    ctx.beginPath(); ctx.moveTo(hx - dir * sc * 1, hy - sc * 1.5); ctx.lineTo(hx - dir * sc * 3.2, hy - sc * 4); ctx.lineTo(hx - dir * sc * 2.2, hy - sc * 0.8); ctx.fill();   // crête
+    for (let k = 0; k < 3; k++) {                                     // bosses du dos
+      const hh = sc * (5.6 - k * 1.2) * env * (0.7 + 0.3 * Math.sin(T * 1.2 + k + m.ph));
+      ctx.beginPath(); ctx.ellipse(x0 - dir * (k * 9 + 9) * sc, wy, sc * 3.8, hh, 0, Math.PI, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.moveTo(x0 - dir * 32 * sc, wy + sc); ctx.lineTo(x0 - dir * 36 * sc, wy - 6 * sc * env); ctx.lineTo(x0 - dir * 38 * sc, wy + sc); ctx.fill();   // nageoire de queue
+  };
+  ctx.save();                                                         // au-dessus de l'eau seulement
+  ctx.beginPath(); ctx.rect(0, 0, W, wy + sc * 0.8); ctx.clip();
+  body();
+  ctx.restore();
+  ctx.save();                                                         // reflet
+  ctx.beginPath(); ctx.rect(0, wy, W, H - wy); ctx.clip();
+  ctx.translate(0, 2 * wy); ctx.scale(1, -1); ctx.globalAlpha = 0.28;
+  body();
+  ctx.restore();
+
+  // Remous : anneaux d'écume autour du point d'immersion, gouttes qui retombent de la tête
+  const foam = mix(sky.hor, [255, 255, 255], 0.5);
+  ctx.lineWidth = Math.max(1, sc * 0.5);
+  for (let i = 0; i < 3; i++) {
+    const p = (T * 0.45 + i / 3) % 1;
+    ctx.strokeStyle = rgb(foam, (1 - p) * 0.5 * env);
+    ctx.beginPath(); ctx.ellipse(x0, wy + sc * 0.6, sc * (6 + p * 16), sc * (1.5 + p * 3.6), 0, 0, 6.2832); ctx.stroke();
+  }
+  ctx.fillStyle = rgb(foam, 0.7 * env);
+  for (let k = 0; k < 14; k++) {
+    const tt = (T * 1.6 + k * 0.31) % 1.4, vx = dir * ((k % 5) - 2) * sc * 3.2;
+    const px = hx + vx * tt, py = hy + (-sc * 9) * tt + 0.5 * sc * 28 * tt * tt;
+    if (py > wy) continue;
+    ctx.globalAlpha = (1 - tt / 1.4) * env;
+    ctx.beginPath(); ctx.arc(px, py, sc * 0.55, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Œil rougeoyant la nuit
+  const night = clamp(sky.star * 1.2, 0, 1);
+  if (night > 0.05) {
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = night * env * 0.9;
+    const s = sc * 6; ctx.drawImage(GLOW_FIRE, hx + dir * sc * 1.6 - s / 2, hy - sc * 0.3 - s / 2, s, s);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
   }
 }
 
@@ -1445,6 +1713,7 @@ const mkGlow = (r, g, b) => {
 };
 const JELLY_COLORS = [[120, 230, 255], [190, 140, 255], [140, 255, 190]];
 const JELLY_GLOWS = JELLY_COLORS.map(c => mkGlow(...c));
+const GLOW_FIRE = mkGlow(255, 140, 40), GLOW_FIRE2 = mkGlow(255, 228, 150);   // flammes du dragon, yeux du monstre
 
 // Positions des oiseaux (décalage derrière le meneur) pour un type de formation
 const FORMATIONS = ['v', 'line', 'row', 'ring', 'cluster', 'swarm'];
@@ -1488,12 +1757,13 @@ function spawnFlock(f, onScreen) {
 function spawnDragon() {
   const dir = crR() < 0.5 ? -1 : 1, sc = U * 0.0016;
   dragon = { active: true, dir, sc, x: dir > 0 ? -sc * 90 : W + sc * 90, y: (0.14 + crR() * 0.2) * H,
-             v: W / (45 + crR() * 25), ph: crR() * 6.28, wait: 0, base: 0 };
+             v: W / (45 + crR() * 25), ph: crR() * 6.28, wait: 0, base: 0, fireAt: T + 3 + crR() * 4, fireT0: -99 };
   dragon.base = dragon.y;
+  if (QS.has('dragon')) { dragon.x = W * (dir > 0 ? 0.25 : 0.75); dragon.fireAt = T + 1.2; }   // test : déjà à l'écran
 }
 function buildCreatures() {
   flocks = Array.from({ length: 4 }, () => { const f = { wait: 0 }; spawnFlock(f, true); return f; });
-  dragon = { active: false, wait: 10 };
+  dragon = { active: false, wait: QS.has('dragon') ? 0.2 : 10 };
   jellies = Array.from({ length: 7 }, () => ({
     x: crR() * W, y: (0.12 + crR() * 0.4) * H, s: U * (0.007 + crR() * 0.006),
     v: (4 + crR() * 6) * (crR() < 0.5 ? -1 : 1), ph: crR() * 6.28, c: (crR() * 3) | 0
@@ -1508,6 +1778,8 @@ function updateCreatures(dt) {
   if (dragon.active) {
     dragon.x += dragon.dir * dragon.v * dt;
     dragon.y = dragon.base + Math.sin(T * 0.5 + dragon.ph) * H * 0.03;
+    // Souffle de feu toutes les 6 à 13 s, seulement quand le dragon est bien à l'écran
+    if (T >= dragon.fireAt && dragon.x > W * 0.08 && dragon.x < W * 0.92) { dragon.fireT0 = T; dragon.fireAt = T + 6 + crR() * 7; }
     if (dragon.x < -dragon.sc * 100 || dragon.x > W + dragon.sc * 100) { dragon.active = false; dragon.wait = 40 + crR() * 50; }
   } else if ((dragon.wait -= dt) <= 0) spawnDragon();
   for (const j of jellies) { j.x += j.v * dt; if (j.x > W + 80) j.x = -80; else if (j.x < -80) j.x = W + 80; }
@@ -1573,6 +1845,35 @@ function drawDragon(sky) {
   ctx.beginPath(); ctx.moveTo(hx + dir * sc * 1, hy - sc * 1.3); ctx.lineTo(hx - dir * sc * 2.5, hy - sc * 3.6); ctx.stroke();
   ctx.lineCap = 'butt';
   glow(hx + dir * sc * 2.4, hy - sc * 0.5, sc * 7, nightK * 0.9);   // œil incandescent la nuit
+
+  // Souffle de feu : gerbe de flammes qui jaillit de la gueule, monte vite puis s'éteint doucement
+  const age = T - d.fireT0, DUR = 1.9;
+  if (age >= 0 && age < DUR) {
+    const env = Math.min(1, age / 0.25) * Math.min(1, (DUR - age) / 0.7);
+    const len = sc * 78 * (0.35 + 0.65 * Math.min(1, age / 0.5));          // la flamme s'allonge
+    const mx = hx + dir * sc * 6.8, my = hy + sc * 0.5, ang = 0.2;
+    const dx = dir * Math.cos(ang), dy = Math.sin(ang);
+    const bright = sky.star > 0.4;                                          // additif la nuit, opaque le jour
+    const N = 38;
+    for (let i = 0; i < N; i++) {
+      const q = i / (N - 1), dist = q * len;
+      const jx = Math.sin(T * 23 + i * 7.3) * sc * (0.3 + q * 1.8);          // tremblement des flammes
+      const jy = Math.cos(T * 19 + i * 5.1) * sc * (0.3 + q * 2) - q * q * sc * 5;   // elles montent en s'éloignant
+      const size = sc * (4.5 + q * 15);
+      ctx.globalCompositeOperation = (bright || q < 0.5) ? 'lighter' : 'source-over';
+      ctx.globalAlpha = clamp(env * (1 - q) * 0.9 * (0.75 + 0.25 * Math.sin(T * 31 + i)), 0, 1);
+      ctx.drawImage(q < 0.45 ? GLOW_FIRE2 : GLOW_FIRE, mx + dx * dist + jx - size / 2, my + dy * dist + jy - size / 2, size, size);
+    }
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = env;
+    ctx.drawImage(GLOW_FIRE2, mx - sc * 6, my - sc * 6, sc * 12, sc * 12);  // cœur incandescent à la gueule
+    for (let i = 0; i < 10; i++) {                                          // étincelles projetées
+      const tt = (T * 2 + i * 0.37) % 1, dist = len * (0.3 + tt * 0.9);
+      ctx.globalAlpha = (1 - tt) * env * 0.9;
+      ctx.fillStyle = '#ffd27a';
+      ctx.fillRect(mx + dx * dist + Math.sin(i * 12.9) * sc * 4, my + dy * dist + Math.cos(i * 7.7) * sc * 4 + tt * sc * 6, sc * 0.6, sc * 0.6);
+    }
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  }
 }
 function drawJellies(sky) {
   const vis = clamp(sky.star * 1.1, 0, 1) * (1 - wth.rain * 0.7) * (1 - wth.fog * 0.5);
@@ -1788,7 +2089,7 @@ function updateWorld(dt) {
   for (const c of clouds) { c.x += c.v * (0.4 + windK * 3) * dt; if (c.x > W + c.ext) c.x = -c.ext; }
   if (!bolt && wth.storm > 0.3 && T > nextBolt) { spawnBolt(); nextBolt = T + 3 + crR() * 8; }
   if (bolt) { const age = T - bolt.t0; flash = boltFlash(age); if (age > 1.4) { bolt = null; flash = 0; } }
-  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt); updateLife(dt);
+  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt); updateLife(dt); updateMonster(dt);
 }
 
 /* --------------------------------------------------------------------------
@@ -1808,6 +2109,7 @@ buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build cr
 buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
 buildStars = safe('build étoiles', buildStars);
 drawIslandLife = safe('vie des îles', drawIslandLife); drawFalls = safe('cascades', drawFalls);
+drawMonster = safe('monstre marin', drawMonster); updateMonster = safe('maj monstre', updateMonster);
 drawVines = safe('lianes', drawVines); updateLife = safe('maj vie', updateLife);
 
 /* --------------------------------------------------------------------------
