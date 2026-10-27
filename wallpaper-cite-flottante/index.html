@@ -29,7 +29,7 @@
 (() => {
 'use strict';
 
-const BUILD = 'v1.7';
+const BUILD = 'v1.8';
 const QS = new URLSearchParams(location.search);   // paramètres de test : ?dragon et ?monster font apparaître les créatures tout de suite   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
@@ -865,6 +865,7 @@ function drawFrame(sky, hour) {
   drawClouds(sky);
   drawLightning();
   drawJellies(sky);
+  drawBalloons(sky);
   drawBirds(sky);
   drawDragon(sky);
 
@@ -2074,8 +2075,96 @@ function drawRays(x, y, k, col, reach) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
+/* ==========================================================================
+   8g. MONTGOLFIÈRES : dérivent avec le vent, brûleur qui s'allume, ballon éclairé la nuit
+   ========================================================================== */
+const BALLOON_COLORS = [
+  [[214, 64, 58], [246, 236, 220], [240, 170, 50]],      // rouge, crème, orange
+  [[52, 110, 190], [246, 240, 226], [230, 80, 80]],      // bleu, crème, rouge
+  [[60, 150, 110], [250, 235, 190], [210, 90, 60]],      // vert, ivoire, brique
+  [[140, 80, 170], [245, 200, 220], [250, 225, 120]],    // violet, rose, jaune
+  [[230, 140, 40], [250, 226, 150], [190, 60, 50]]       // orange, jaune pâle, rouge sombre
+];
+let balloons = [];
+// Demi-largeur de l'enveloppe selon la hauteur (t de 0 = sommet à 1 = goulot) : forme en goutte
+const balloonHW = t => Math.max(2.6, 10.5 * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.8)), 0.75));
+// Enveloppe + fuseaux (bandes verticales de couleurs alternées) dessinés une fois
+function makeBalloonShape(rn) {
+  const N = 22, env = new Path2D(), k = rn() < 0.5 ? 2 : 3, n = 8 + 2 * ((rn() * 3) | 0);
+  const gp = Array.from({ length: k }, () => new Path2D());
+  const ptY = j => -13.5 + 27.5 * (j / N);
+  for (let j = 0; j <= N; j++) env[j ? 'lineTo' : 'moveTo'](-balloonHW(j / N), ptY(j));
+  for (let j = N; j >= 0; j--) env.lineTo(balloonHW(j / N), ptY(j));
+  env.closePath();
+  for (let i = 0; i < n; i++) {
+    const a0 = -1 + 2 * i / n, a1 = -1 + 2 * (i + 1) / n, p = gp[i % k];
+    for (let j = 0; j <= N; j++) p[j ? 'lineTo' : 'moveTo'](a0 * balloonHW(j / N), ptY(j));
+    for (let j = N; j >= 0; j--) p.lineTo(a1 * balloonHW(j / N), ptY(j));
+    p.closePath();
+  }
+  const band = new Path2D(); band.rect(-11, -1.5, 22, 3.4);
+  return { env, gp, k, band, hasBand: rn() < 0.5 };
+}
+function respawnBalloon(b, first) {
+  const near = crR();
+  b.near = near; b.s = U * (0.0020 + 0.0032 * near); b.haze = 0.32 * (1 - near);
+  b.y0 = (0.10 + crR() * 0.28) * H; b.v = (5 + crR() * 8) * (U / 1920) * (0.6 + near * 0.8);
+  b.pal = BALLOON_COLORS[(crR() * BALLOON_COLORS.length) | 0]; b.shape = makeBalloonShape(crR);
+  b.ph = crR() * 6.28; b.period = 7 + crR() * 6;
+  if (!first) b.x = -30 * b.s;
+}
+function buildBalloons() {
+  balloons = [0.18, 0.52, 0.84].map(fx => { const b = { x: fx * W }; respawnBalloon(b, true); return b; });
+}
+function updateBalloons(dt) {
+  for (const b of balloons) {
+    b.x += b.v * dt * (0.6 + windK * 2.2);                              // le vent les pousse vers la droite
+    if (b.x > W + 30 * b.s) respawnBalloon(b, false);
+  }
+}
+function drawBalloons(sky) {
+  const vis = clamp(1 - wth.rain * 1.2 - wth.storm - wth.fog * 0.5, 0, 1);       // ils se posent par mauvais temps
+  if (vis < 0.03) return;
+  const night = lampBase, hor = sky.hor;
+  for (const b of balloons) {
+    const cyc = (T + b.ph * 3) % b.period, burst = cyc < 0.9 ? Math.sin(Math.PI * cyc / 0.9) : 0;   // coup de brûleur
+    const y = b.y0 + Math.sin(T * 0.11 + b.ph) * H * 0.03 - burst * b.s * 1.2;
+    const tilt = Math.sin(T * 0.5 + b.ph) * 0.035;                                // balancement du panier
+    // couleurs : assombries la nuit, brumeuses au loin, réchauffées par l'éclairage intérieur
+    const warm = night * (0.3 + 0.5 * burst);
+    const tint = c => mix(mix(mix(c, [12, 16, 34], 0.55 * sky.star * (1 - warm)), [255, 196, 120], warm * 0.55), hor, b.haze);
+    const dark = tint([70, 52, 40]);
+    ctx.globalAlpha = vis;
+    ctx.save();
+    ctx.translate(b.x, y); ctx.rotate(tilt); ctx.scale(b.s, b.s);
+    // cordages, panier et brûleur
+    ctx.strokeStyle = rgb(dark); ctx.lineWidth = 0.25;
+    ctx.beginPath(); ctx.moveTo(-2.6, 13.6); ctx.lineTo(-2.2, 19); ctx.moveTo(2.6, 13.6); ctx.lineTo(2.2, 19); ctx.moveTo(-0.9, 14); ctx.lineTo(-0.7, 19); ctx.moveTo(0.9, 14); ctx.lineTo(0.7, 19); ctx.stroke();
+    ctx.fillStyle = rgb(dark); ctx.fillRect(-2.4, 19, 4.8, 3.4); ctx.fillRect(-2.7, 18.6, 5.4, 0.8); ctx.fillRect(-0.5, 15, 1, 1.2);
+    // enveloppe : fond, fuseaux alternés, bande horizontale éventuelle
+    const [c0, c1, c2] = b.pal.map(tint), sh = b.shape;
+    ctx.fillStyle = rgb(c0); ctx.fill(sh.env);
+    ctx.fillStyle = rgb(c1); ctx.fill(sh.gp[1]);
+    if (sh.k === 3) { ctx.fillStyle = rgb(c2); ctx.fill(sh.gp[2]); }
+    if (sh.hasBand) { ctx.save(); ctx.clip(sh.env); ctx.fillStyle = rgb(sh.k === 3 ? c0 : c2); ctx.fill(sh.band); ctx.restore(); }
+    // ombrage doux d'un côté pour donner du volume
+    const g = ctx.createLinearGradient(-10, 0, 10, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,30,0.28)');
+    ctx.fillStyle = g; ctx.fill(sh.env);
+    // lueur du brûleur et éclairage de l'enveloppe la nuit
+    ctx.globalCompositeOperation = 'lighter';
+    const inner = night * 0.3 + burst * 0.22;
+    if (inner > 0.02) { ctx.globalAlpha = vis * inner; ctx.drawImage(GLOW_FIRE, -14, -14, 28, 28); }
+    ctx.globalAlpha = vis * (burst * 0.95 + night * 0.18);
+    ctx.drawImage(GLOW_FIRE2, -3.5, 12.2, 7, 7);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
 // Recrée tout ce qui dépend de la taille d'écran
-function buildWorld() { buildClouds(); buildPrecip(); buildBoats(); buildCreatures(); buildParticles(); buildPaint();
+function buildWorld() { buildClouds(); buildPrecip(); buildBoats(); buildCreatures(); buildParticles(); buildPaint(); buildBalloons();
   fogWisps = Array.from({ length: 9 }, (_, i) => ({ x: (i / 9) * (W + 800), y: HZ + (0.03 + 0.9 * ((i * 37) % 9) / 9) * (H - HZ), w: U * (0.45 + 0.35 * ((i * 53) % 7) / 7), v: 6 + (i % 4) * 3 })); }
 
 // Met à jour la météo lissée et toutes les animations indépendantes du dessin
@@ -2089,7 +2178,7 @@ function updateWorld(dt) {
   for (const c of clouds) { c.x += c.v * (0.4 + windK * 3) * dt; if (c.x > W + c.ext) c.x = -c.ext; }
   if (!bolt && wth.storm > 0.3 && T > nextBolt) { spawnBolt(); nextBolt = T + 3 + crR() * 8; }
   if (bolt) { const age = T - bolt.t0; flash = boltFlash(age); if (age > 1.4) { bolt = null; flash = 0; } }
-  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt); updateLife(dt); updateMonster(dt);
+  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt); updateLife(dt); updateMonster(dt); updateBalloons(dt);
 }
 
 /* --------------------------------------------------------------------------
@@ -2109,6 +2198,7 @@ buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build cr
 buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
 buildStars = safe('build étoiles', buildStars);
 drawIslandLife = safe('vie des îles', drawIslandLife); drawFalls = safe('cascades', drawFalls);
+drawBalloons = safe('montgolfières', drawBalloons); updateBalloons = safe('maj montgolfières', updateBalloons); buildBalloons = safe('build montgolfières', buildBalloons);
 drawMonster = safe('monstre marin', drawMonster); updateMonster = safe('maj monstre', updateMonster);
 drawVines = safe('lianes', drawVines); updateLife = safe('maj vie', updateLife);
 
