@@ -29,7 +29,7 @@
 (() => {
 'use strict';
 
-const BUILD = 'v1.5';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
+const BUILD = 'v1.6';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
    1. CONFIGURATION (modifiée par les propriétés de Wallpaper Engine)
@@ -1467,7 +1467,7 @@ function flockSlots(kind, n, w) {
 // avec sa propre taille, vitesse, altitude et nombre d'oiseaux : elles ne se ressemblent jamais
 function spawnFlock(f, onScreen) {
   const dir = crR() < 0.5 ? -1 : 1, solo = crR() < 0.2;                // 1 volée sur 5 : un ou deux grands planeurs
-  f.dir = dir; f.w = U * (solo ? 0.009 + crR() * 0.004 : 0.0035 + crR() * 0.005);
+  f.dir = dir; f.w = U * (solo ? 0.0055 + crR() * 0.0025 : 0.002 + crR() * 0.0028);   // demi-envergure en pixels (petits oiseaux lointains)
   const n = solo ? 1 + (crR() * 2 | 0) : 5 + (crR() * 17 | 0);
   const kA = FORMATIONS[(crR() * FORMATIONS.length) | 0];
   let kB = FORMATIONS[(crR() * FORMATIONS.length) | 0];
