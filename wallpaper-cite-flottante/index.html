@@ -29,7 +29,7 @@
 (() => {
 'use strict';
 
-const BUILD = 'v1.4';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
+const BUILD = 'v1.5';   // affiché sous la date ; à changer à chaque livraison pour vérifier quelle version tourne
 
 /* --------------------------------------------------------------------------
    1. CONFIGURATION (modifiée par les propriétés de Wallpaper Engine)
@@ -190,11 +190,34 @@ function glow(x, y, size, a) {
   ctx.globalCompositeOperation = 'source-over';
 }
 
-const TREE = new Path2D();         // forme d'arbre partagée (silhouette)
-TREE.rect(-0.7, -5, 1.4, 5.5);
-TREE.ellipse(0, -9.5, 4.2, 5.6, 0, 0, Math.PI * 2);
-TREE.ellipse(-2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
-TREE.ellipse(2.4, -6.6, 3, 3.4, 0, 0, Math.PI * 2);
+// Ellipse dans un Path2D : on pose d'abord le point de départ, sinon le navigateur trace un segment parasite
+function ell(p, x, y, rx, ry, rot = 0) {
+  p.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot));
+  p.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+}
+
+// Essences d'arbres (silhouettes, base en y = 0, hauteur de 8 à 16 unités) ; sw = sensibilité au vent
+const TREE_TYPES = (() => {
+  const mk = f => { const p = new Path2D(); f(p); return p; };
+  return {
+    round:   { sw: 1,   path: mk(p => { p.rect(-0.7, -5, 1.4, 5.5); ell(p, 0, -9.5, 4.2, 5.6); ell(p, -2.4, -6.6, 3, 3.4); ell(p, 2.4, -6.6, 3, 3.4); }) },
+    pine:    { sw: 0.6, path: mk(p => {
+      p.rect(-0.5, -3, 1, 3.4);
+      for (const [apex, base, half] of [[-16, -10.5, 2.6], [-13, -6.5, 3.5], [-9.5, -2.6, 4.4]]) {   // trois étages de branches
+        p.moveTo(0, apex); p.lineTo(-half, base); p.lineTo(half, base); p.closePath();
+      } }) },
+    cypress: { sw: 0.5, path: mk(p => { p.rect(-0.4, -2, 0.8, 2.4); ell(p, 0, -8.5, 1.9, 7); }) },
+    bush:    { sw: 0.3, path: mk(p => { ell(p, 0, -1.8, 3.2, 2.2); ell(p, -2.6, -1.2, 2.4, 1.7); ell(p, 2.6, -1.2, 2.4, 1.7); }) },
+    willow:  { sw: 1.3, path: mk(p => {                         // saule pleureur : voûte + branches retombantes
+      p.rect(-0.7, -5, 1.4, 5.5); ell(p, 0, -9, 5.2, 3.2);
+      for (let i = -4; i <= 4; i++) p.rect(i * 1.15 - 0.2, -8.5, 0.45, 4.2 + ((i * 7) % 3 + 3) * 0.6); }) },
+    palm:    { sw: 1.5, path: mk(p => {                         // palmier : tronc courbe + palmes qui retombent
+      p.moveTo(-0.6, 0.4); p.quadraticCurveTo(-0.2, -7, 1.2, -13); p.lineTo(2, -13); p.quadraticCurveTo(0.8, -7, 0.7, 0.4); p.closePath();
+      for (const dx of [-4.2, -3, -1.4, 1.4, 3, 4.2]) ell(p, 1.6 + dx, -13 + Math.abs(dx) * 0.35 - 0.8, 3.2, 0.9, dx * 0.12); }) }
+  };
+})();
+// Échelle aléatoire (min, max) selon l'essence
+const TREE_SCALE = { round: [0.7, 1.1], pine: [0.9, 1.3], cypress: [0.9, 1.4], willow: [0.9, 1.15], palm: [0.9, 1.15], bush: [0.9, 1.3] };
 
 function resize() {
   W = window.innerWidth || 1920; H = window.innerHeight || 1080;   // repli si la fenêtre n'a pas encore de taille
@@ -241,82 +264,256 @@ function buildMountains() {
 }
 
 /* --------------------------------------------------------------------------
-   6. ÎLES FLOTTANTES (silhouettes + arbres + bâtiments)
+   6. ÎLES FLOTTANTES : chaque île a un thème, une forme de rocher et des habitants
       Coordonnées locales : l'île fait 100 unités de large, surface en y = 0.
    -------------------------------------------------------------------------- */
+// Largeur occupée (unités locales) par chaque type d'élément posé sur une île
+const WIDTH = { tree: 9, bush: 5, house: 9, longhouse: 14, tower: 6, keep: 15, chapel: 10, windmill: 9,
+                pagoda: 11, dome: 10, lighthouse: 7, stall: 6, obelisk: 3, fence: 9 };
+// Thèmes : éléments obligatoires, éléments de remplissage (poids), essences d'arbres (poids), nombre d'habitants
+const THEMES = {
+  castle:  { must: ['keep', 'tower', 'tower', 'chapel'], fill: { house: 3, tree: 2, stall: 1, bush: 1, obelisk: 0.5 }, trees: { round: 3, cypress: 1, cherry: 1.5, pine: 1 }, people: 4 },
+  village: { must: ['chapel', 'house', 'house'], fill: { house: 4, tree: 2, stall: 1.5, bush: 1, longhouse: 0.6 }, trees: { round: 2, pine: 2, cherry: 1, willow: 0.6 }, people: 3 },
+  farm:    { must: ['windmill', 'longhouse'], fill: { longhouse: 1, fence: 2, tree: 2, bush: 2, house: 1, windmill: 0.5 }, trees: { round: 3, willow: 1 }, people: 3 },
+  forest:  { must: [], fill: { tree: 6, bush: 2, house: 0.6 }, trees: { pine: 4, cypress: 2, round: 1, palm: 1.5 }, people: 1 },
+  light:   { must: ['lighthouse'], fill: { tree: 2, bush: 2, house: 1 }, trees: { pine: 2, round: 1, palm: 2 }, people: 1 },
+  temple:  { must: ['pagoda', 'pagoda'], fill: { tree: 3, stall: 1, obelisk: 1, bush: 1 }, trees: { cherry: 4, round: 1, pine: 1 }, people: 2 },
+  observ:  { must: ['dome', 'tower'], fill: { tree: 2, house: 1, bush: 1, obelisk: 1 }, trees: { pine: 3, cypress: 2 }, people: 1 }
+};
+// Tirage pondéré dans { clé: poids }
+function pickW(r, weights) {
+  const e = Object.entries(weights);
+  let t = e.reduce((a, [, w]) => a + w, 0) * r();
+  for (const [k, w] of e) { t -= w; if (t <= 0) return k; }
+  return e[e.length - 1][0];
+}
+
 function buildIslands() {
-  // x, alt = hauteur au-dessus de l'horizon (fraction de H), size = largeur (fraction de U)
+  // x, alt = hauteur au-dessus de l'horizon (fraction de H), size = largeur (fraction de U) ;
+  // shape : tp = finesse du cône (grand = bol arrondi), yp = profondeur du profil, depth, amp = relief de la surface,
+  //         spikes = stalactites ; fall = côté d'une cascade (-1 gauche, 1 droite, 0 aucune)
   const defs = [
-    { x: 0.42, alt: 0.37, size: 0.21, haze: 0.00 },   // île principale
-    { x: 0.71, alt: 0.43, size: 0.13, haze: 0.10 },
-    { x: 0.17, alt: 0.31, size: 0.12, haze: 0.12 },
-    { x: 0.89, alt: 0.31, size: 0.07, haze: 0.28 },
-    { x: 0.58, alt: 0.25, size: 0.06, haze: 0.30 },
-    { x: 0.07, alt: 0.47, size: 0.06, haze: 0.30 },
-    { x: 0.29, alt: 0.50, size: 0.05, haze: 0.38 }
+    { x: 0.42, alt: 0.37, size: 0.21, haze: 0.00, theme: 'castle',  fall: 0,  shape: { tp: 1.0, yp: 0.85, depth: 62, amp: 1.0, spikes: 0.15 } },
+    { x: 0.71, alt: 0.43, size: 0.13, haze: 0.10, theme: 'village', fall: 0,  shape: { tp: 1.7, yp: 0.72, depth: 44, amp: 0.5, spikes: 0.0 } },
+    { x: 0.17, alt: 0.31, size: 0.12, haze: 0.12, theme: 'farm',    fall: -1, shape: { tp: 0.85, yp: 1.0, depth: 70, amp: 1.2, spikes: 0.3 } },
+    { x: 0.89, alt: 0.31, size: 0.07, haze: 0.28, theme: 'forest',  fall: 1,  shape: { tp: 2.1, yp: 0.62, depth: 36, amp: 0.7, spikes: 0.0 } },
+    { x: 0.58, alt: 0.25, size: 0.06, haze: 0.30, theme: 'light',   fall: -1, shape: { tp: 1.2, yp: 0.9,  depth: 58, amp: 1.4, spikes: 0.45 } },
+    { x: 0.07, alt: 0.47, size: 0.06, haze: 0.30, theme: 'temple',  fall: 1,  shape: { tp: 1.4, yp: 0.8,  depth: 50, amp: 0.4, spikes: 0.2 } },
+    { x: 0.29, alt: 0.50, size: 0.05, haze: 0.38, theme: 'observ',  fall: 0,  shape: { tp: 0.9, yp: 0.95, depth: 66, amp: 1.0, spikes: 0.3 } }
   ];
   islands = defs.map((d, n) => {
     const r = rng(1000 + n * 977);
     const s = d.size * U / 100;                    // échelle local -> pixels
-    const depth = 50 + r() * 22;                   // profondeur du rocher
+    const sh = d.shape, depth = sh.depth + r() * 6;
+    const th = THEMES[d.theme];
+    const hill = x => sh.amp * (-3.2 * Math.sin(x * 0.08 + n) - 1.4 * Math.sin(x * 0.21 + n * 2));
 
-    // Surface : légères collines
-    const hill = x => -3.2 * Math.sin(x * 0.08 + n) - 1.4 * Math.sin(x * 0.21 + n * 2);
-    const body = new Path2D();
+    // Corps : surface vallonnée puis rocher dont le profil dépend de la forme choisie
+    const body = new Path2D(), under = [];
     body.moveTo(-50, 0);
     for (let x = -50; x <= 50; x += 5) body.lineTo(x, hill(x));
-    // Face inférieure : cône de roche irrégulier, côté droit puis côté gauche
-    const tipX = (r() - 0.5) * 8, steps = 7;
-    for (let k = 1; k <= steps; k++) {
-      const t = k / steps;
-      body.lineTo(lerp(50, tipX, t) - (r() * 6) * (1 - t) * 0.6, depth * Math.pow(t, 0.85) + (r() - 0.5) * 3);
+    const tipX = (r() - 0.5) * 8, steps = 8;
+    const edgeX = (side, t) => lerp(50 * side, tipX, Math.pow(t, sh.tp));
+    const edgeY = t => depth * Math.pow(t, sh.yp);
+    for (let k = 1; k <= steps; k++) {                                   // côté droit, de haut en bas
+      const t = k / steps, x = edgeX(1, t) - r() * 6 * (1 - t) * 0.6, y = edgeY(t) + (r() - 0.5) * 3;
+      body.lineTo(x, y); under.push({ x, y });
+      if (k < steps && r() < sh.spikes) body.lineTo(x - 2.5, y + 4 + r() * 7);   // stalactite
     }
-    for (let k = steps - 1; k >= 1; k--) {
-      const t = k / steps;
-      body.lineTo(lerp(-50, tipX, t) + (r() * 6) * (1 - t) * 0.6, depth * Math.pow(t, 0.85) + (r() - 0.5) * 3);
+    for (let k = steps - 1; k >= 1; k--) {                               // côté gauche, de bas en haut
+      const t = k / steps, x = edgeX(-1, t) + r() * 6 * (1 - t) * 0.6, y = edgeY(t) + (r() - 0.5) * 3;
+      if (r() < sh.spikes) body.lineTo(x + 2.5, y + 4 + r() * 7);
+      body.lineTo(x, y); under.push({ x, y });
     }
     body.closePath();
+    const grass = new Path2D();                                          // bande d'herbe (ou de neige) sur la surface
+    grass.moveTo(-50, hill(-50));
+    for (let x = -50; x <= 50; x += 5) grass.lineTo(x, hill(x));
+    for (let x = 50; x >= -50; x -= 5) grass.lineTo(x, hill(x) + 1.9);
+    grass.closePath();
 
-    // Bâtiments et arbres répartis sur 8 emplacements
-    const structs = new Path2D(), trees = [], bldgs = [];
-    const slots = 8, slotW = 80 / slots;
+    // Peuplement
+    const structs = new Path2D(), trees = [], bldgs = [], wins = [], lamps = [];
+    const anim = { mills: [], flags: [], chimneys: [], beacons: [] };
     // Fenêtres et lanternes : chacune a un seuil « thr » d'allumage, donc la ville
     // s'illumine petit à petit au fil du crépuscule, pas toutes d'un coup
-    const wins = [], lamps = [];
     const addWins = (cx, y, w, h, cols, rows) => {
       for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++)
         wins.push({ x: cx - w / 2 + (w / cols) * (i + 0.5) - 0.8, y: y - h + 2.5 + j * ((h - 4) / rows), thr: 0.02 + r() * 0.8 });
     };
     const addLamp = (x, y) => lamps.push({ x, y, thr: 0.02 + r() * 0.8, ph: r() * 6.28 });
-    for (let k = 0; k < slots; k++) {
-      const cx = -40 + slotW * (k + 0.5) + (r() - 0.5) * 2;
-      const y = hill(cx), kind = r();
-      if (d.size < 0.07 && kind < 0.55) continue;               // petites îles : moins chargées
-      if (kind < 0.45) {                                         // arbre
-        trees.push({ x: cx, y, sc: 0.8 + r() * 0.7, ph: r() * 6.28 });
-        if (r() < 0.4) addLamp(cx + 2.5, y - 6);                 // lanterne accrochée à l'arbre
-      } else if (kind < 0.8) {                                   // maison avec toit
-        const w = 6 + r() * 4, h = 6 + r() * 8;
+    const chimney = (x, base) => { structs.rect(x - 0.6, base - 4, 1.2, 4.5); anim.chimneys.push({ x, y: base - 4, ph: r() * 6.28 }); };
+    const flag = (x, y, len = 3.6) => { structs.rect(x - 0.2, y - 5, 0.4, 5.5); anim.flags.push({ x: x + 0.2, y: y - 5, len, ph: r() * 6.28 }); };
+
+    const B = {
+      house(cx, y) {
+        const w = 6.5 + r() * 3, h = 6 + r() * 7, pk = 4.5 + r() * 2.5;
         structs.rect(cx - w / 2, y - h, w, h + 2);
-        structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx, y - h - 5); structs.lineTo(cx + w / 2 + 1, y - h);
+        structs.moveTo(cx - w / 2 - 1, y - h); structs.lineTo(cx + (r() < 0.3 ? w * 0.18 : 0), y - h - pk); structs.lineTo(cx + w / 2 + 1, y - h); structs.closePath();
+        if (r() < 0.55) chimney(cx + (r() < 0.5 ? -1 : 1) * w * 0.25, y - h - pk * 0.55);
         bldgs.push({ x: cx, y, w, h });
-        addWins(cx, y, w, h, Math.max(1, Math.floor((w - 1) / 3.5)), h > 10 ? 2 : 1);
-        addLamp(cx + w / 2 + 1.8, y - 3);                        // lanterne près de la porte
-      } else {                                                   // tour avec flèche
-        const w = 4 + r() * 2, h = 22 + r() * 22;
+        addWins(cx, y, w, h, Math.max(1, Math.floor((w - 1) / 3.5)), h > 9 ? 2 : 1);
+        addLamp(cx + w / 2 + 1.8, y - 3);
+      },
+      longhouse(cx, y) {                                                  // longère basse à toit en croupe
+        const w = 12 + r() * 3, h = 5 + r() * 2;
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        structs.moveTo(cx - w / 2 - 1.2, y - h); structs.lineTo(cx - w / 2 + 1.8, y - h - 3.4);
+        structs.lineTo(cx + w / 2 - 1.8, y - h - 3.4); structs.lineTo(cx + w / 2 + 1.2, y - h); structs.closePath();
+        if (r() < 0.5) chimney(cx + w * 0.25, y - h - 3);
+        bldgs.push({ x: cx, y, w, h });
+        addWins(cx, y, w, h, Math.floor(w / 3.6), 1);
+        addLamp(cx - w / 2 - 1.6, y - 3);
+      },
+      tower(cx, y) {                                                      // tour : flèche, dôme en oignon ou créneaux
+        const w = 4 + r() * 2, h = 18 + r() * 24, kind = r();
         structs.rect(cx - w / 2, y - h, w, h + 2);
         structs.rect(cx - w / 2 - 1, y - h - 2, w + 2, 3);
-        structs.moveTo(cx - w / 2 - 1.5, y - h - 2); structs.lineTo(cx, y - h - 13); structs.lineTo(cx + w / 2 + 1.5, y - h - 2);
-        structs.rect(cx - 0.25, y - h - 18, 0.5, 6);
+        if (kind < 0.55) {
+          structs.moveTo(cx - w / 2 - 1.5, y - h - 2); structs.lineTo(cx, y - h - 13); structs.lineTo(cx + w / 2 + 1.5, y - h - 2); structs.closePath();
+          if (r() < 0.6) flag(cx, y - h - 13); else structs.rect(cx - 0.25, y - h - 18, 0.5, 6);
+          addLamp(cx, y - h - 14);
+        } else if (kind < 0.8) {
+          ell(structs, cx, y - h - 5, w * 0.85, 3.6);
+          structs.moveTo(cx - 1, y - h - 7.5); structs.lineTo(cx, y - h - 12); structs.lineTo(cx + 1, y - h - 7.5); structs.closePath();
+          addLamp(cx, y - h - 6);
+        } else {
+          for (let i = 0; i < 3; i++) structs.rect(cx - w / 2 - 1 + i * ((w + 2) / 2.3), y - h - 4, (w + 2) / 4.2, 2.2);
+          flag(cx, y - h - 4);
+        }
         bldgs.push({ x: cx, y, w, h, tower: true });
         addWins(cx, y, w, h, 1, Math.max(1, Math.floor((h - 4) / 7)));
-        addLamp(cx, y - h - 14);                                 // feu au sommet de la flèche
+      },
+      keep(cx, y) {                                                       // donjon crénelé flanqué de deux tourelles
+        const w = 12 + r() * 2, h = 13 + r() * 6, tn = 6, tw = w / (2 * tn - 1);
+        structs.rect(cx - w / 2, y - h, w, h + 2);
+        for (let i = 0; i < tn; i++) structs.rect(cx - w / 2 + 2 * i * tw, y - h - 1.8, tw, 1.9);
+        for (const sx of [-1, 1]) {
+          const tx = cx + sx * (w / 2 + 0.4);
+          structs.rect(tx - 1.7, y - h - 5, 3.4, h + 7);
+          structs.moveTo(tx - 2.3, y - h - 5); structs.lineTo(tx, y - h - 11); structs.lineTo(tx + 2.3, y - h - 5); structs.closePath();
+          addLamp(tx, y - h - 11.5);
+        }
+        flag(cx, y - h - 1.8, 4.2);
+        bldgs.push({ x: cx, y, w, h });
+        addWins(cx, y, w - 2, h - 1, 3, Math.max(1, Math.floor(h / 6)));
+      },
+      chapel(cx, y) {                                                     // nef + clocher surmonté d'une croix
+        structs.rect(cx - 4.2, y - 6, 6.2, 8);
+        structs.moveTo(cx - 5.2, y - 6); structs.lineTo(cx - 1.1, y - 10.5); structs.lineTo(cx + 3, y - 6); structs.closePath();
+        structs.rect(cx + 1.4, y - 15, 3, 17);
+        structs.moveTo(cx + 0.6, y - 15); structs.lineTo(cx + 2.9, y - 20.5); structs.lineTo(cx + 5.2, y - 15); structs.closePath();
+        structs.rect(cx + 2.65, y - 24, 0.5, 3.8); structs.rect(cx + 1.7, y - 23, 2.4, 0.5);
+        bldgs.push({ x: cx, y, w: 9, h: 6 });
+        addWins(cx - 1, y, 6, 6, 2, 1);
+        addLamp(cx + 5.8, y - 3); addLamp(cx + 2.9, y - 12);
+      },
+      windmill(cx, y) {                                                   // moulin : les pales tournent (voir drawIslandLife)
+        structs.moveTo(cx - 3.2, y + 1.5); structs.lineTo(cx - 1.9, y - 13); structs.lineTo(cx + 1.9, y - 13); structs.lineTo(cx + 3.2, y + 1.5); structs.closePath();
+        structs.moveTo(cx - 2.6, y - 13); structs.lineTo(cx, y - 17); structs.lineTo(cx + 2.6, y - 13); structs.closePath();
+        anim.mills.push({ x: cx, y: y - 11.2, ph: r() * 6.28, dir: r() < 0.5 ? 1 : -1, sp: 0.8 + r() * 0.5 });
+        bldgs.push({ x: cx, y, w: 6, h: 13 });
+        addWins(cx, y, 3.4, 8, 1, 1);
+        addLamp(cx + 4.4, y - 2.5);
+      },
+      pagoda(cx, y) {                                                     // pagode à trois toits retroussés
+        structs.rect(cx - 5, y - 1.2, 10, 3.2);
+        let yb = y - 1.2;
+        for (let t = 0; t < 3; t++) {
+          const bw = 9 - t * 2.2, top = yb - 3.2;
+          structs.rect(cx - bw * 0.32, top, bw * 0.64, 3.4);
+          structs.moveTo(cx - bw * 0.85, top + 0.4);
+          structs.quadraticCurveTo(cx - bw * 0.3, top - 0.1, cx, top - 2.6);
+          structs.quadraticCurveTo(cx + bw * 0.3, top - 0.1, cx + bw * 0.85, top + 0.4);
+          structs.closePath();
+          addWins(cx, yb, bw * 0.64, 3.2, 1, 1);
+          if (t < 2) { addLamp(cx - bw * 0.8, top + 0.9); addLamp(cx + bw * 0.8, top + 0.9); }
+          yb = top - 2.2;
+        }
+        structs.rect(cx - 0.25, yb - 5, 0.5, 6.5);
+        bldgs.push({ x: cx, y, w: 10, h: 16 });
+      },
+      dome(cx, y) {                                                       // observatoire : dôme à fente éclairée
+        structs.rect(cx - 4.5, y - 7, 9, 9);
+        structs.moveTo(cx - 4.8, y - 7); structs.ellipse(cx, y - 7, 4.8, 4.8, 0, Math.PI, Math.PI * 2); structs.closePath();
+        structs.rect(cx + 4.4, y - 4, 3, 6);
+        structs.rect(cx - 0.25, y - 14.6, 0.5, 2.2);
+        wins.push({ x: cx - 0.8, y: y - 11.2, thr: 0.05 + r() * 0.3 });
+        bldgs.push({ x: cx, y, w: 9, h: 12 });
+        addWins(cx, y, 9, 7, 2, 1);
+        addLamp(cx - 6, y - 3);
+      },
+      lighthouse(cx, y) {                                                 // phare : faisceau tournant la nuit
+        structs.moveTo(cx - 2.8, y + 1.5); structs.lineTo(cx - 1.9, y - 26); structs.lineTo(cx + 1.9, y - 26); structs.lineTo(cx + 2.8, y + 1.5); structs.closePath();
+        structs.rect(cx - 3.2, y - 27.4, 6.4, 1.5);
+        structs.rect(cx - 1.9, y - 31.6, 3.8, 4.4);
+        structs.moveTo(cx - 2.8, y - 31.6); structs.lineTo(cx, y - 36); structs.lineTo(cx + 2.8, y - 31.6); structs.closePath();
+        anim.beacons.push({ x: cx, y: y - 29.4, ph: r() * 6.28 });
+        bldgs.push({ x: cx, y, w: 6, h: 36 });
+        addWins(cx, y, 3.6, 20, 1, 2);
+        addLamp(cx, y - 29.4);
+      },
+      stall(cx, y) {                                                      // étal de marché sous auvent
+        structs.rect(cx - 2.2, y - 3, 0.4, 3.2); structs.rect(cx + 1.8, y - 3, 0.4, 3.2);
+        structs.moveTo(cx - 3.2, y - 3); structs.lineTo(cx, y - 5); structs.lineTo(cx + 3.2, y - 3); structs.closePath();
+        structs.rect(cx - 2.2, y - 1.4, 4.4, 1.6);
+        addLamp(cx, y - 2.6);
+      },
+      obelisk(cx, y) {
+        structs.moveTo(cx - 0.8, y + 1); structs.lineTo(cx - 0.6, y - 8); structs.lineTo(cx, y - 10); structs.lineTo(cx + 0.6, y - 8); structs.lineTo(cx + 0.8, y + 1); structs.closePath();
+        structs.rect(cx - 1.4, y - 0.8, 2.8, 1.8);
+      },
+      fence(cx, y) {                                                      // clôture de pré
+        for (let x = cx - 4; x <= cx + 4.01; x += 1.8) structs.rect(x - 0.2, hill(x) - 2, 0.4, 2.4);
+        structs.rect(cx - 4, hill(cx) - 1.7, 8, 0.35);
+      },
+      bush(cx) { trees.push({ type: 'bush', tint: 0, x: cx, y: hill(cx), sc: 0.9 + r() * 0.4, ph: r() * 6.28 }); },
+      tree(cx) {
+        const tk = pickW(r, th.trees), cherry = tk === 'cherry', type = cherry ? 'round' : tk;
+        const count = r() < 0.3 ? 2 : 1, [lo, hi] = TREE_SCALE[type];
+        for (let i = 0; i < count; i++) {
+          const x = cx + (i - (count - 1) / 2) * 3.4 + (r() - 0.5);
+          trees.push({ type, tint: cherry ? 1 : (type === 'round' && r() < 0.12 ? 2 : 0),   // 1 = cerisier rose, 2 = feuillage d'automne
+                       x, y: hill(x), sc: lo + r() * (hi - lo), ph: r() * 6.28 });
+          if (r() < 0.3) addLamp(x + 2.5, hill(x) - 6);
+        }
       }
+    };
+
+    // Disposition : éléments obligatoires + remplissage tiré au sort, mélangés puis répartis sur la largeur
+    const cap = d.size >= 0.12 ? 80 : d.size >= 0.07 ? 66 : 48;
+    const kinds = th.must.slice();
+    let used = kinds.reduce((a, k) => a + WIDTH[k], 0);
+    for (let tries = 0; tries < 16; tries++) {
+      const k = pickW(r, th.fill);
+      if (used + WIDTH[k] + 1.5 <= cap) { kinds.push(k); used += WIDTH[k]; }
+    }
+    for (let i = kinds.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [kinds[i], kinds[j]] = [kinds[j], kinds[i]]; }
+    const gap = Math.max(0.8, (cap - used) / (kinds.length + 1));
+    let cursor = -cap / 2 + gap;
+    for (const k of kinds) {
+      const cx = cursor + WIDTH[k] / 2;
+      B[k](cx, hill(cx));
+      cursor += WIDTH[k] + gap;
     }
     // Poteaux-lanternes aux deux extrémités (points d'attache des ponts)
     for (const ex of [-45, 45]) { structs.rect(ex - 0.3, hill(ex) - 5, 0.6, 5.5); addLamp(ex, hill(ex) - 5.5); }
+
+    // Habitants qui se promènent sur la surface (positions mises à jour dans updateLife)
+    const people = Math.round(th.people * clamp(d.size / 0.15, 0.25, 1));
+    const walkers = Array.from({ length: people }, () => ({
+      x: -34 + r() * 68, dir: r() < 0.5 ? -1 : 1, v: 1.1 + r() * 1.1, pause: r() * 4, ph: r() * 6.28, lo: -38, hi: 38
+    }));
+    // Lianes qui pendent sous le rocher
+    const vines = Array.from({ length: Math.round(2 + d.size * 20) }, () => {
+      const u = under[(r() * under.length) | 0];
+      return { x: u.x, y: u.y, len: 8 + r() * 18, ph: r() * 6.28 };
+    });
+    // Cascade qui tombe du bord de l'île
+    const falls = d.fall ? [{ x: d.fall * 47.5, y: hill(d.fall * 47.5) + 0.5, side: d.fall, len: 55 + r() * 45 }] : [];
+
     return {
-      id: n, edgeL: hill(-45), edgeR: hill(45), wins, lamps,
+      id: n, edgeL: hill(-45), edgeR: hill(45), wins, lamps, hill, grass, anim, walkers, vines, falls,
       x: d.x * W, y: HZ - d.alt * H, s, depth, haze: d.haze, body, structs, trees, bldgs,
       ph: r() * 6.28, f: 0.35 + r() * 0.35,        // phase et fréquence du flottement
       bobAmp: (0.004 + d.size * 0.02) * H          // amplitude : les grandes îles bougent un peu plus
@@ -324,12 +521,15 @@ function buildIslands() {
   });
   islands.sort((a, b) => b.haze - a.haze);          // les plus lointaines d'abord
 
-  // Ponts suspendus : paires d'îles voisines (identifiants de `defs`)
+  // Ponts suspendus : paires d'îles voisines (identifiants de `defs`), avec des passants qui les traversent
   const byId = id => islands.find(i => i.id === id);
   bridges = [[0, 1], [0, 2], [1, 3]].map(([a, b], k) => {
     let A = byId(a), B = byId(b);
     if (A.x > B.x) [A, B] = [B, A];                 // A à gauche, B à droite
-    return { A, B, ph: k * 1.7 };
+    const r = rng(4000 + k);
+    return { A, B, ph: k * 1.7, walkers: Array.from({ length: 2 }, () => ({
+      t: r(), dir: r() < 0.5 ? -1 : 1, v: 1 / (45 + r() * 40), pause: r() * 5
+    })) };
   });
 }
 
@@ -368,6 +568,15 @@ function drawBridge(br, sky) {
     const flick = 0.85 + 0.15 * Math.sin(T * (4 + i) + br.ph * 9);
     glow(p[0], p[1] - rail, U * 0.011, clamp((lamp - thr) * 5, 0, 1) * flick);
   });
+  // Passants : petites silhouettes qui traversent le pont d'une île à l'autre (lanterne en main la nuit)
+  const u = U * 0.0026, dim = 1 - (br.A.haze + br.B.haze) * 0.25;
+  ctx.fillStyle = rgb(mix(col, sky.hor, 0.12));
+  for (const w of br.walkers) {
+    const p = pt(w.t), step = w.pause > 0 ? 0 : Math.abs(Math.sin(T * 5 + w.t * 40)) * u * 0.12;
+    ctx.fillRect(p[0] - u * 0.25, p[1] - u * 1.9 - step, u * 0.5, u * 1.7);
+    ctx.beginPath(); ctx.arc(p[0], p[1] - u * 2.3 - step, u * 0.34, 0, 6.2832); ctx.fill();
+    if (lamp > 0.2) glow(p[0] + w.dir * u * 0.8, p[1] - u * 1.2, U * 0.008, clamp((lamp - 0.2) * 3, 0, 1) * dim);
+  }
 }
 
 function buildStars() {
@@ -666,17 +875,24 @@ function drawFrame(sky, hour) {
   drawPaint();
 }
 
-// Dessine une île avec son flottement et le balancement des arbres
+// Exécute fn avec un état de dessin sauvegardé, restauré même si fn plante
+function inState(fn) { ctx.save(); try { fn(); } finally { ctx.restore(); } }
+
+// Dessine une île avec son flottement, sa végétation et ses habitants
 function drawIsland(isl, sky) {
   const amp  = cfg.floatAmp;
   const bob  = Math.sin(T * isl.f + isl.ph) * isl.bobAmp * amp;           // haut / bas
   const tilt = Math.sin(T * isl.f * 0.7 + isl.ph * 1.3) * 0.012 * amp;    // léger roulis
 
-  const col = mix(sky.sil, sky.hor, clamp(isl.haze + wth.fog * 0.45, 0, 0.95));
+  const hz = clamp(isl.haze + wth.fog * 0.45, 0, 0.95);                   // le brouillard estompe les îles
+  const col = mix(sky.sil, sky.hor, hz);
+  const dayK = clamp(1 - sky.star, 0, 1), snowK = clamp(wth.snow * 1.2, 0, 0.85);
   ctx.save();
   ctx.translate(isl.x, isl.y + bob);
   ctx.rotate(tilt);
   ctx.scale(isl.s, isl.s);
+
+  drawFalls(isl, sky);                                                    // cascade, derrière le rocher
 
   // Dégradé : surface nette, base du rocher fondue dans la brume
   const gr = ctx.createLinearGradient(0, -30, 0, isl.depth);
@@ -685,19 +901,28 @@ function drawIsland(isl, sky) {
   gr.addColorStop(1, rgb(mix(col, sky.hor, 0.45)));
   ctx.fillStyle = gr;
   ctx.fill(isl.body);
+  // Herbe le jour, neige quand il neige
+  ctx.fillStyle = rgb(mix(mix(col, [84, 140, 86], 0.4 * dayK * (1 - hz)), [236, 242, 250], snowK * (0.5 + 0.5 * dayK)));
+  ctx.fill(isl.grass);
+  ctx.fillStyle = gr;
   ctx.fill(isl.structs);
+  drawVines(isl, col, dayK);
 
-  // Arbres : balancement léger (cisaillement horizontal qui croît avec la hauteur)
-  ctx.fillStyle = rgb(mix(col, sky.top, 0.06));
+  // Arbres : balancement léger (cisaillement horizontal qui croît avec la hauteur), selon l'essence
+  const base = mix(col, sky.top, 0.06), tk = 0.55 * dayK * (1 - hz) * (1 - snowK);
   for (const t of isl.trees) {
-    // balancement doux : une oscillation principale + une plus lente, amplitude croissante avec le vent
-    const sway = Math.sin(swayPh + t.ph + t.x * 0.1) * (0.035 + windK * 0.07) + Math.sin(swayPh * 0.43 + t.ph * 1.7) * 0.02;
+    const ty = TREE_TYPES[t.type];
+    // une oscillation principale + une plus lente, amplitude croissante avec le vent
+    const sway = (Math.sin(swayPh + t.ph + t.x * 0.1) * (0.035 + windK * 0.07) + Math.sin(swayPh * 0.43 + t.ph * 1.7) * 0.02) * ty.sw;
+    ctx.fillStyle = rgb(t.tint === 1 ? mix(base, [236, 134, 176], tk) : t.tint === 2 ? mix(base, [214, 126, 56], tk) : base);
     ctx.save();
     ctx.translate(t.x, t.y + 0.5);
     ctx.transform(t.sc, 0, sway * t.sc, t.sc, 0, 0);
-    ctx.fill(TREE);
+    ctx.fill(ty.path);
     ctx.restore();
   }
+
+  drawIslandLife(isl, sky, col, dayK, 1 - isl.haze * 0.5);                // moulins, fumée, drapeaux, habitants, phare
 
   // Lumières de la ville : fenêtres puis lanternes, allumées progressivement
   if (lamp > 0.01) {
@@ -716,6 +941,117 @@ function drawIsland(isl, sky) {
     }
   }
   ctx.restore();
+}
+
+/* --------------------------------------------------------------------------
+   Vie sur les îles
+   -------------------------------------------------------------------------- */
+let millPh = 0, flagPh = 0;                              // phases cumulées (moulins, drapeaux)
+
+// Pales de moulin : quatre bras avec leurs toiles, dessinés une fois en polygones tournés
+const BLADES = new Path2D();
+for (let k = 0; k < 4; k++) {
+  const a = k * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+  const poly = pts => pts.forEach(([x, y], i) => i ? BLADES.lineTo(x * c - y * s, x * s + y * c) : BLADES.moveTo(x * c - y * s, x * s + y * c));
+  poly([[0.8, -0.3], [8.6, -0.3], [8.6, 0.3], [0.8, 0.3]]); BLADES.closePath();       // bras
+  poly([[2.2, 0.3], [8.4, 0.3], [8.4, 2.5], [2.2, 2.1]]); BLADES.closePath();         // toile
+}
+
+// Cascade : filet d'eau qui tombe du bord de l'île et s'efface dans la brume
+function drawFalls(isl, sky) {
+  if (!isl.falls.length) return;
+  const w = mix(sky.hor, [255, 255, 255], 0.55);
+  for (const f of isl.falls) {
+    const L = f.len, ex = f.x + f.side * 3 + windK * 9;
+    const g = ctx.createLinearGradient(0, f.y, 0, f.y + L);
+    g.addColorStop(0, rgb(w, 0.6)); g.addColorStop(1, rgb(w, 0));
+    ctx.strokeStyle = g; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.quadraticCurveTo(f.x + f.side * 1.5, f.y + L * 0.4, ex, f.y + L);
+    ctx.lineWidth = 2.4; ctx.globalAlpha *= 0.45; ctx.stroke();                 // voile d'eau
+    ctx.globalAlpha /= 0.45;
+    ctx.lineWidth = 0.9; ctx.setLineDash([5, 3.5]); ctx.lineDashOffset = -T * 16; ctx.stroke();   // filets qui coulent
+    ctx.setLineDash([]); ctx.lineCap = 'butt';
+  }
+}
+
+// Lianes qui pendent sous le rocher et se balancent avec le vent
+function drawVines(isl, col, dayK) {
+  ctx.strokeStyle = rgb(mix(col, [70, 120, 72], 0.3 * dayK));
+  ctx.lineWidth = 0.45;
+  ctx.beginPath();
+  for (const v of isl.vines) {
+    ctx.moveTo(v.x, v.y);
+    for (let k = 1; k <= 5; k++)
+      ctx.lineTo(v.x + Math.sin(swayPh * 0.9 + v.ph + k * 0.7) * (0.4 + windK * 1.6) * k * 0.35, v.y + k * v.len / 5);
+  }
+  ctx.stroke();
+}
+
+function drawIslandLife(isl, sky, col, dayK, dim) {
+  const A = isl.anim, dark = mix(col, sky.top, 0.04);
+
+  // Moulins : les pales tournent plus vite avec le vent
+  ctx.fillStyle = rgb(dark);
+  for (const m of A.mills) inState(() => { ctx.translate(m.x, m.y); ctx.rotate(millPh * m.sp * m.dir + m.ph); ctx.fill(BLADES); });
+
+  // Drapeaux : tissu ondulant, rouge le jour
+  ctx.fillStyle = rgb(mix(col, [196, 62, 56], 0.5 * dayK * (isl.haze < 0.35 ? 1 : 0.4)));
+  for (const f of A.flags) {
+    const amp = 0.55 * (0.6 + windK * 1.6), n = 5;
+    ctx.beginPath(); ctx.moveTo(f.x, f.y);
+    for (let i = 1; i <= n; i++) { const u = i / n; ctx.lineTo(f.x + u * f.len, f.y + Math.sin(flagPh + u * 4 + f.ph) * amp * u); }
+    for (let i = n; i >= 0; i--) { const u = i / n; ctx.lineTo(f.x + u * f.len, f.y + 1.8 * (1 - u * 0.25) + Math.sin(flagPh + u * 4 + f.ph) * amp * u); }
+    ctx.fill();
+  }
+
+  // Fumée des cheminées : volutes grises qui montent et dérivent avec le vent
+  const smoke = mix(col, [205, 208, 218], 0.55), calm = 1 - wth.rain * 0.7;
+  for (const c of A.chimneys) {
+    for (let i = 0; i < 5; i++) {
+      const u = (T * 0.1 + i / 5 + c.ph) % 1;
+      ctx.fillStyle = rgb(smoke, (1 - u) * 0.34 * calm * dim);
+      ctx.beginPath();
+      ctx.arc(c.x + Math.sin(u * 7 + c.ph * 3) * 1.0 + windK * u * 10, c.y - u * 16, 0.8 + u * 2.2, 0, 6.2832);
+      ctx.fill();
+    }
+  }
+
+  // Habitants : petites silhouettes qui marchent, avec une lanterne la nuit
+  ctx.fillStyle = rgb(mix(col, sky.hor, 0.12));
+  for (const w of isl.walkers) {
+    const y = isl.hill(w.x) - Math.abs(Math.sin(T * 5 + w.ph)) * (w.pause > 0 ? 0 : 0.22);
+    ctx.fillRect(w.x - 0.45, y - 2.7, 0.9, 2.5);
+    ctx.beginPath(); ctx.arc(w.x, y - 3.3, 0.6, 0, 6.2832); ctx.fill();
+  }
+  if (lamp > 0.1) for (const w of isl.walkers) glow(w.x + w.dir * 0.9, isl.hill(w.x) - 1.6, 5, clamp((lamp - 0.2) * 3, 0, 1) * dim);
+
+  // Phare : faisceau qui balaie, plus long quand il pointe de côté
+  if (lamp > 0.05) for (const b of A.beacons) {
+    const cs = Math.cos(T * 0.7 + b.ph), len = 8 + 70 * Math.abs(cs), sg = cs >= 0 ? 1 : -1;
+    const a = (0.12 + 0.5 * Math.abs(cs)) * clamp(lamp * 1.5, 0, 1) * dim;
+    const g = ctx.createLinearGradient(b.x, 0, b.x + sg * len, 0);
+    g.addColorStop(0, `rgba(255,236,190,${a.toFixed(3)})`); g.addColorStop(1, 'rgba(255,236,190,0)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y - 0.7); ctx.lineTo(b.x + sg * len, b.y - 1.2 - Math.abs(cs) * 3.5); ctx.lineTo(b.x + sg * len, b.y + 1.2 + Math.abs(cs) * 3.5); ctx.lineTo(b.x, b.y + 0.7);
+    ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+// Met en mouvement les habitants des îles et les passants des ponts
+function updateLife(dt) {
+  millPh += dt * (0.5 + windK * 3);
+  flagPh += dt * (3 + windK * 6);
+  for (const isl of islands) for (const w of isl.walkers) {
+    if (w.pause > 0) { w.pause -= dt; continue; }
+    w.x += w.dir * w.v * dt;
+    if (w.x < w.lo || w.x > w.hi) { w.x = clamp(w.x, w.lo, w.hi); w.dir = -w.dir; w.pause = 2 + crR() * 6; }
+    else if (crR() < dt * 0.08) w.pause = 1.5 + crR() * 4;          // pauses au hasard
+  }
+  for (const br of bridges) for (const w of br.walkers) {
+    if (w.pause > 0) { w.pause -= dt; continue; }
+    w.t += w.dir * w.v * dt;
+    if (w.t < 0 || w.t > 1) { w.t = clamp(w.t, 0, 1); w.dir = -w.dir; w.pause = 2 + crR() * 5; }
+  }
 }
 
 /* ==========================================================================
@@ -1268,9 +1604,10 @@ function drawJellies(sky) {
        Les tableaux sont dimensionnés pour l'intensité maximale (2) ; à l'intensité 1
        on n'en affiche que la moitié.
    ========================================================================== */
-const FLY_N = 90, DUST_N = 160, PETAL_N = 40;
+const FLY_N = 90, DUST_N = 160, PETAL_N = 40, BUT_N = 40, LANT_N = 24;
 const GLOW_FLY = mkGlow(200, 255, 120), GLOW_GOLD = mkGlow(255, 225, 150);
-let flies = [], dust = [], petals = [];
+const BUTTER_COLORS = ['255,170,60', '250,248,240', '244,214,76', '150,190,255', '255,140,170'];
+let flies = [], dust = [], petals = [], butter = [], lants = [];
 
 function respawnPetal(p, init) {
   const i = p.isl, k = U / 1920;
@@ -1295,6 +1632,17 @@ function buildParticles() {
   });
   const big = islands.filter(i => i.haze < 0.15);
   petals = Array.from({ length: PETAL_N }, () => { const p = { isl: big[(r() * big.length) | 0] }; respawnPetal(p, true); return p; });
+  // Papillons : butinent autour des îles (arbres et prés) en journée
+  butter = Array.from({ length: BUT_N }, () => {
+    const i = near[(r() * near.length) | 0];
+    return { hx: i.x + (r() - 0.5) * i.s * 90, hy: i.y + (r() - 0.9) * 22 * i.s, ax: (14 + r() * 40) * k, ay: (8 + r() * 22) * k,
+             a: 0.5 + r() * 0.7, b: 0.6 + r() * 0.8, ph: r() * 6.28, sz: (2.6 + r() * 1.6) * k * 1.4, c: BUTTER_COLORS[(r() * BUTTER_COLORS.length) | 0] };
+  });
+  // Lanternes célestes : s'élèvent lentement des îles la nuit
+  lants = Array.from({ length: LANT_N }, () => {
+    const i = islands[(r() * islands.length) | 0];
+    return { hx: i.x + (r() - 0.5) * i.s * 70, hy: i.y + i.depth * i.s * 0.2, sp: 0.014 + r() * 0.012, ph: r(), amp: (10 + r() * 26) * k, sz: (11 + r() * 7) * k * 1.4 };
+  });
 }
 function updatePetals(dt) {
   const k = U / 1920, n = Math.floor(PETAL_N * clamp(cfg.particles / 2, 0, 1));
@@ -1334,6 +1682,16 @@ function drawParticles(sky) {
     ctx.drawImage(p.gold ? GLOW_GOLD : JELLY_GLOWS[0], x - p.sz / 2, y - p.sz / 2, p.sz, p.sz);
   }
   ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  if (night > 0.05) {                                              // lanternes célestes qui montent et dérivent
+    const nl = Math.floor(LANT_N * f);
+    for (let i = 0; i < nl; i++) {
+      const p = lants[i], u = (T * p.sp + p.ph) % 1;
+      const x = p.hx + Math.sin(u * 9 + p.ph * 20) * p.amp + windK * u * 220 * (U / 1920);
+      const y = p.hy - u * H * 0.5;
+      glow(x, y, p.sz * (0.9 + 0.1 * Math.sin(T * 5 + p.ph * 30)), Math.sin(Math.PI * u) * night * 0.9);
+    }
+  }
 
   const pv = dayK * calm;                                          // pétales : le jour seulement
   if (pv > 0.05) {
@@ -1349,6 +1707,19 @@ function drawParticles(sky) {
       ctx.scale(1, 0.25 + 0.75 * Math.abs(Math.cos(p.rot * 1.7)));   // le pétale se retourne
       ctx.beginPath(); ctx.ellipse(0, 0, p.sz, p.sz * 0.55, 0, 0, 6.2832); ctx.fill();
       ctx.restore();
+    }
+    // Papillons : trajectoire capricieuse, ailes qui battent vite
+    const nb = Math.floor(BUT_N * f);
+    for (let i = 0; i < nb; i++) {
+      const p = butter[i];
+      const x = p.hx + Math.sin(T * p.a + p.ph) * p.ax + Math.sin(T * p.a * 2.7 + p.ph) * p.ax * 0.3;
+      const y = p.hy + Math.sin(T * p.b * 1.3 + p.ph * 2) * p.ay + Math.sin(T * 3.1 + p.ph) * p.sz * 0.4;
+      const w = p.sz * (0.25 + 0.75 * Math.abs(Math.sin(T * 13 + p.ph * 5)));          // ouverture des ailes
+      ctx.fillStyle = `rgba(${p.c},${(pv * 0.9).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.ellipse(x - w * 0.5, y, w * 0.5, p.sz * 0.42, 0, 0, 6.2832);
+      ctx.ellipse(x + w * 0.5, y, w * 0.5, p.sz * 0.42, 0, 0, 6.2832);
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -1417,7 +1788,7 @@ function updateWorld(dt) {
   for (const c of clouds) { c.x += c.v * (0.4 + windK * 3) * dt; if (c.x > W + c.ext) c.x = -c.ext; }
   if (!bolt && wth.storm > 0.3 && T > nextBolt) { spawnBolt(); nextBolt = T + 3 + crR() * 8; }
   if (bolt) { const age = T - bolt.t0; flash = boltFlash(age); if (age > 1.4) { bolt = null; flash = 0; } }
-  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt);
+  updatePrecip(dt); updateBoats(dt); updateCreatures(dt); updatePetals(dt); updateLife(dt);
 }
 
 /* --------------------------------------------------------------------------
@@ -1436,6 +1807,8 @@ buildClouds = safe('build nuages', buildClouds); buildPrecip = safe('build pluie
 buildBoats = safe('build barques', buildBoats);  buildCreatures = safe('build créatures', buildCreatures);
 buildParticles = safe('build particules', buildParticles); buildPaint = safe('build peinture', buildPaint);
 buildStars = safe('build étoiles', buildStars);
+drawIslandLife = safe('vie des îles', drawIslandLife); drawFalls = safe('cascades', drawFalls);
+drawVines = safe('lianes', drawVines); updateLife = safe('maj vie', updateLife);
 
 /* --------------------------------------------------------------------------
    9. BOUCLE PRINCIPALE
