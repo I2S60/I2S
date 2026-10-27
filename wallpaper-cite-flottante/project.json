@@ -94,6 +94,12 @@
         "fraction": true,
         "precision": 2
       },
+      "showclock": {
+        "order": 14,
+        "text": "Afficher l'heure à l'écran",
+        "type": "bool",
+        "value": true
+      },
       "weatherenabled": {
         "order": 7,
         "text": "Activer la météo en temps réel",

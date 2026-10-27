@@ -41,6 +41,7 @@ const cfg = {
   particles:   1,      // intensité des particules (0 = aucune, 2 = maximum)
   painted:     0.7,    // force de l'effet « peinture » (grain de toile, coups de pinceau)
   godRays:     0.6,    // intensité des rayons de lumière
+  showClock:   true,   // affiche l'heure à l'écran (désactivable dans les réglages)
   renderScale: 1,      // résolution interne (0.5 à 1)
   fpsLimit:    60,     // fournie par Wallpaper Engine (réglage « FPS » global)
   debug:       false
@@ -343,7 +344,7 @@ function drawBridge(br, sky) {
   const [x0, y0] = anchor(br.A, 45, br.A.edgeR - 3);
   const [x1, y1] = anchor(br.B, -45, br.B.edgeL - 3);
   const dist = Math.hypot(x1 - x0, y1 - y0);
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + dist * 0.2 + Math.sin(T * (0.8 + windK * 2) + br.ph) * dist * (0.004 + windK * 0.02);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + dist * 0.2 + Math.sin(bridgePh + br.ph) * dist * (0.004 + windK * 0.012);
   const col = mix(sky.sil, sky.hor, (br.A.haze + br.B.haze) / 2);
   const lw = Math.max(0.8, U * 0.0012), rail = U * 0.009;
   const pt = t => [
@@ -681,7 +682,8 @@ function drawIsland(isl, sky) {
   // Arbres : balancement léger (cisaillement horizontal qui croît avec la hauteur)
   ctx.fillStyle = rgb(mix(col, sky.top, 0.06));
   for (const t of isl.trees) {
-    const sway = Math.sin(T * (1.4 + windK * 2.5) + t.ph + t.x * 0.1) * (0.05 + windK * 0.14);   // plus de vent = arbres plus agités
+    // balancement doux : une oscillation principale + une plus lente, amplitude croissante avec le vent
+    const sway = Math.sin(swayPh + t.ph + t.x * 0.1) * (0.035 + windK * 0.07) + Math.sin(swayPh * 0.43 + t.ph * 1.7) * 0.02;
     ctx.save();
     ctx.translate(t.x, t.y + 0.5);
     ctx.transform(t.sc, 0, sway * t.sc, t.sc, 0, 0);
@@ -724,6 +726,9 @@ const PRESETS = {                                                               
 const wth  = { ...CLEAR };     // météo affichée (rejoint la cible en douceur)
 const wthT = { ...CLEAR };     // météo cible (issue de l'API ou du mode test)
 let windK = 0.15;              // vent instantané avec rafales (0 à 1)
+// Phases d'oscillation CUMULÉES : on ajoute dt * fréquence à chaque image. Écrire sin(T * f(vent))
+// faisait « sauter » la phase dès que le vent variait (et de plus en plus avec le temps), d'où les vibrations.
+let swayPh = 0, bridgePh = 0, fogPh = 0;
 let wxInfo = 'météo : ciel clair (défaut)';
 const wx = { on: true, auto: true, city: '', test: 'auto', lastOk: 0, retry: null, deb: null };
 { const t = new URLSearchParams(location.search).get('weather'); if (t) wx.test = t; }
@@ -977,7 +982,7 @@ function drawFog(sky) {
   // Bancs de brume qui dérivent sur le lac
   ctx.globalAlpha = wth.fog * 0.22;
   for (const w of fogWisps) {
-    const wx2 = ((w.x + T * w.v * (0.5 + windK * 2)) % (W + 800)) - 400;
+    const wx2 = ((w.x + fogPh * w.v) % (W + 800)) - 400;
     ctx.drawImage(cloudLitC, wx2 - w.w / 2, w.y - w.w * 0.07, w.w, w.w * 0.14);
   }
   ctx.globalAlpha = 1;
@@ -994,17 +999,21 @@ let fogWisps = [];
 const HULL = new Path2D();
 HULL.moveTo(-10, -2); HULL.lineTo(11, -3.2); HULL.quadraticCurveTo(8, 2, 0, 2.4); HULL.quadraticCurveTo(-7, 2, -10, -2); HULL.closePath();
 const MAST = new Path2D(); MAST.rect(-0.3, -17, 0.6, 15);
-const SAIL = new Path2D(); SAIL.moveTo(0.9, -16.5); SAIL.quadraticCurveTo(7, -10, 8.5, -3.6); SAIL.lineTo(0.9, -3.6); SAIL.closePath();
-const JIB  = new Path2D(); JIB.moveTo(-0.9, -15);  JIB.quadraticCurveTo(-5.5, -9, -8, -3.8); JIB.lineTo(-0.9, -3.8); JIB.closePath();
+// Voilier : grand-voile vers l'arrière (gauche) et foc vers l'avant (droite, côté de la proue)
+const SAIL = new Path2D(); SAIL.moveTo(-0.9, -16.5); SAIL.quadraticCurveTo(-7, -10, -8.5, -3.6); SAIL.lineTo(-0.9, -3.6); SAIL.closePath();
+const JIB  = new Path2D(); JIB.moveTo(0.9, -15);  JIB.quadraticCurveTo(5.5, -9, 9, -3.8); JIB.lineTo(0.9, -3.8); JIB.closePath();
+// Voilier à voile latine : mât court, grande voile triangulaire sur une vergue oblique
+const MAST2  = new Path2D(); MAST2.rect(0.3, -15, 0.5, 13);
+const LATEEN = new Path2D(); LATEEN.moveTo(0.8, -18.5); LATEEN.quadraticCurveTo(-1, -10, -9.5, -4.2); LATEEN.lineTo(8.5, -4.2); LATEEN.closePath();
+const YARD   = new Path2D(); YARD.moveTo(-9.8, -4.1); YARD.lineTo(0.8, -18.8);
 const CABIN = new Path2D(); CABIN.rect(-6.5, -5.2, 4.2, 2.8);
-const POLE  = new Path2D(); POLE.rect(8.6, -10, 0.6, 8);
 let boats = [];
 
 function buildBoats() {
   const r = rng(2024);
-  // u = profondeur sur le lac (0 = loin, 1 = proche) ; sail = voilier ou barque à lanterne
-  boats = [[0.05, 1], [0.22, 1], [0.40, 0], [0.62, 1], [0.85, 0], [0.95, 1]].map(([u, sail]) => ({
-    u, sail, sc: U * (0.0007 + 0.0017 * u), dir: r() < 0.5 ? -1 : 1,
+  // u = profondeur sur le lac (0 = loin, 1 = proche) ; kind : 0 = voilier (grand-voile + foc), 1 = voile latine
+  boats = [[0.05, 0], [0.22, 1], [0.40, 1], [0.62, 0], [0.85, 1], [0.95, 0]].map(([u, kind]) => ({
+    u, kind, sc: U * (0.0007 + 0.0017 * u), dir: r() < 0.5 ? -1 : 1,
     x: r() * W, y: HZ + (H - HZ) * (0.1 + 0.8 * u), v: (5 + 20 * u) * (U / 1920), ph: r() * 6.28
   }));
 }
@@ -1016,12 +1025,21 @@ function updateBoats(dt) {
   }
 }
 function boatShape(b, hull, sail) {
-  ctx.fillStyle = rgb(hull); ctx.fill(HULL);
-  if (b.sail) { ctx.fill(MAST); ctx.fill(CABIN); ctx.fillStyle = rgb(sail); ctx.fill(SAIL); ctx.fill(JIB); }
-  else { ctx.fill(POLE); }
+  ctx.fillStyle = rgb(hull); ctx.fill(HULL); ctx.fill(CABIN);
+  const billow = 1 + 0.035 * Math.sin(T * 1.3 + b.ph);              // la voile gonfle légèrement dans le vent
+  if (b.kind === 0) {
+    ctx.fill(MAST);
+    ctx.fillStyle = rgb(sail);
+    ctx.save(); ctx.scale(billow, 1); ctx.fill(SAIL); ctx.fill(JIB); ctx.restore();
+  } else {
+    ctx.fill(MAST2);
+    ctx.fillStyle = rgb(sail);
+    ctx.save(); ctx.scale(billow, 1); ctx.fill(LATEEN); ctx.restore();
+    ctx.strokeStyle = rgb(hull); ctx.lineWidth = 0.6; ctx.stroke(YARD);
+  }
 }
 function boatLamps(b, a) {
-  const lamps = b.sail ? [[0, -17.6], [-4.4, -5.8]] : [[8.9, -10.6], [-4, -3.4]];
+  const lamps = b.kind === 0 ? [[0, -17.6], [-4.4, -5.8]] : [[0.8, -19.2], [-4.4, -5.8]];
   lamps.forEach((l, i) => glow(l[0], l[1], 12, a * (0.85 + 0.15 * Math.sin(T * (4 + i) + b.ph * 7))));
 }
 function drawBoats(sky) {
@@ -1070,8 +1088,23 @@ const JELLY_GLOWS = JELLY_COLORS.map(c => mkGlow(...c));
 
 function spawnFlock(f, onScreen) {
   const dir = crR() < 0.5 ? -1 : 1;
-  f.dir = dir; f.w = U * (0.0045 + crR() * 0.0035); f.n = 6 + (crR() * 6 | 0);
-  f.v = (35 + crR() * 35) * (U / 1920); f.y = (0.08 + crR() * 0.3) * H; f.ph = crR() * 6.28;
+  const r = crR();
+  f.dir = dir; f.w = U * (0.0042 + crR() * 0.0035);
+  f.kind = r < 0.4 ? 'v' : r < 0.65 ? 'line' : 'swarm';               // V, échelon ou nuée
+  const n = f.kind === 'swarm' ? 14 + (crR() * 12 | 0) : 5 + (crR() * 7 | 0);
+  f.v = (30 + crR() * 35) * (U / 1920); f.y = (0.08 + crR() * 0.3) * H; f.ph = crR() * 6.28;
+  f.birds = Array.from({ length: n }, (_, i) => {
+    let ox, oy;
+    if (f.kind === 'swarm') { ox = (crR() - 0.5) * f.w * 16; oy = (crR() - 0.5) * f.w * 8; }
+    else {
+      const k = Math.ceil(i / 2), side = i % 2 ? 1 : -1;               // k = rang derrière le meneur
+      ox = k * f.w * 2.3 + (crR() - 0.5) * f.w * 0.5;
+      oy = (f.kind === 'v' ? side : 1) * k * f.w * 1.25 + (crR() - 0.5) * f.w * 0.4;
+    }
+    // chaque oiseau a sa taille, sa cadence de battement et ses petites dérives
+    return { ox, oy, s: 0.75 + crR() * 0.5, ph: crR() * 6.28, rate: 5.5 + crR() * 3,
+             jx: crR() * 6.28, jy: crR() * 6.28, glide: crR() * 6.28 };
+  });
   f.x = onScreen ? crR() * W : (dir > 0 ? -f.w * 20 : W + f.w * 20);
   f.active = true;
 }
@@ -1109,15 +1142,19 @@ function drawBirds(sky) {
   ctx.lineCap = 'round';
   for (const f of flocks) {
     if (!f.active) continue;
-    ctx.lineWidth = Math.max(1, f.w * 0.28);
+    const cy = f.y + Math.sin(T * 0.25 + f.ph) * H * 0.025;           // le vol ondule doucement
+    ctx.lineWidth = Math.max(1, f.w * 0.26);
     ctx.beginPath();
-    for (let i = 0; i < f.n; i++) {
-      const k = Math.ceil(i / 2), side = i % 2 ? 1 : -1;       // formation en V
-      const bx = f.x - f.dir * k * f.w * 2.2, by = f.y + side * k * f.w * 1.3 + Math.sin(T * 0.8 + k) * f.w * 0.4;
-      const fl = Math.sin(T * (7 + (i % 3) * 0.4) + f.ph + k * 0.6), w = f.w;
-      ctx.moveTo(bx - w, by - fl * w * 0.6);
-      ctx.quadraticCurveTo(bx - w * 0.5, by - fl * w * 0.9 - w * 0.25, bx, by);
-      ctx.quadraticCurveTo(bx + w * 0.5, by - fl * w * 0.9 - w * 0.25, bx + w, by - fl * w * 0.6);
+    for (const b of f.birds) {
+      const w = f.w * b.s;
+      const bx = f.x - f.dir * b.ox + Math.sin(T * 0.6 + b.jx) * w * 0.6;   // dérive individuelle
+      const by = cy + b.oy + Math.sin(T * 0.8 + b.jy) * w * 0.5;
+      // alterne battements d'ailes et vol plané, chacun à son rythme
+      const gate = smooth(clamp(0.5 + 1.2 * Math.sin(T * 0.35 + b.glide), 0, 1));
+      const fl = lerp(0.25, Math.sin(T * b.rate + b.ph), gate);
+      ctx.moveTo(bx - w, by - fl * w * 0.55);
+      ctx.quadraticCurveTo(bx - w * 0.45, by - fl * w * 0.85 - w * 0.3, bx, by);
+      ctx.quadraticCurveTo(bx + w * 0.45, by - fl * w * 0.85 - w * 0.3, bx + w, by - fl * w * 0.55);
     }
     ctx.stroke();
   }
@@ -1332,6 +1369,9 @@ function updateWorld(dt) {
   const k = 1 - Math.exp(-dt * 0.5);                             // transition douce (quelques secondes)
   for (const key in wth) wth[key] += (wthT[key] - wth[key]) * k;
   windK = wth.wind * (0.75 + 0.25 * Math.sin(T * 0.6));
+  swayPh += dt * (1.3 + windK * 1.2);
+  bridgePh += dt * (0.7 + windK * 0.7);
+  fogPh += dt * (0.5 + windK * 2);
   for (const c of clouds) { c.x += c.v * (0.4 + windK * 3) * dt; if (c.x > W + c.ext) c.x = -c.ext; }
   if (!bolt && wth.storm > 0.3 && T > nextBolt) { spawnBolt(); nextBolt = T + 3 + crR() * 8; }
   if (bolt) { const age = T - bolt.t0; flash = boltFlash(age); if (age > 1.4) { bolt = null; flash = 0; } }
@@ -1359,6 +1399,7 @@ buildStars = safe('build étoiles', buildStars);
    9. BOUCLE PRINCIPALE
    -------------------------------------------------------------------------- */
 let last = 0, fpsAcc = 0, fpsCount = 0, fpsShown = 0, lampBase = 0;
+let dateKey = -1, dateText = '';                       // date affichée (recalculée une fois par jour)
 
 function frame(ms) {
   requestAnimationFrame(frame);
@@ -1374,6 +1415,30 @@ function frame(ms) {
     applyWeather(sky);
     drawFrame(sky, hourShown);
   } catch (e) { reportError(e, 'image'); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+
+  if (cfg.showClock && hourShown !== null) {            // heure et date, en haut à droite
+    const hh = Math.floor(hourShown), mm = Math.floor((hourShown % 1) * 60);
+    // La date suit le cycle accéléré (elle change quand on passe minuit) ; mise en cache par jour
+    const day = new Date(Date.now() + (cfg.testMode ? 0 : extraHours * 3.6e6));
+    const key = day.getFullYear() * 400 + day.getMonth() * 32 + day.getDate();
+    if (key !== dateKey) {
+      dateKey = key;
+      try { dateText = day.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+      catch (e) { dateText = day.toDateString(); }
+      dateText = dateText.charAt(0).toUpperCase() + dateText.slice(1);
+    }
+    const x = W - H * 0.04, y = H * 0.035, big = Math.round(H * 0.07);
+    ctx.setTransform(cfg.renderScale, 0, 0, cfg.renderScale, 0, 0);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = `300 ${big}px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillText(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, x, y);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = `400 ${Math.round(big * 0.34)}px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillText(dateText, x, y + big * 1.05);
+    ctx.shadowBlur = 0; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
 
   if (cfg.debug) {
     fpsAcc += dt; fpsCount++;
@@ -1397,6 +1462,7 @@ window.wallpaperPropertyListener = {
     if (p.particles)  cfg.particles  = Number(p.particles.value);
     if (p.painted)    cfg.painted    = Number(p.painted.value);
     if (p.godrays)    cfg.godRays    = Number(p.godrays.value);
+    if (p.showclock)  cfg.showClock  = !!p.showclock.value;
     // Météo : tout changement relance une actualisation (avec un court délai anti-rafale)
     if (p.weatherenabled) { wx.on   = !!p.weatherenabled.value; scheduleRefresh(); }
     if (p.autolocation)   { wx.auto = !!p.autolocation.value;   scheduleRefresh(); }
@@ -1411,9 +1477,15 @@ window.wallpaperPropertyListener = {
 
 // Compatibilité Sucrose Wallpaper Engine : mêmes réglages, reçus via SucrosePropertyListener(nom, contrôle)
 const WX_TESTS = ['auto', 'clear', 'cloudy', 'fog', 'rain', 'storm', 'snow', 'wind'];   // même ordre que la liste déroulante
+const BOOL_PROPS = ['testmode', 'weatherenabled', 'autolocation', 'showclock'];
 window.SucrosePropertyListener = (name, val) => {
   if (!val) return;
-  const v = name === 'testweather' ? (WX_TESTS[val.value | 0] || 'auto') : val.value;
+  let v = val.value;
+  if (name === 'testweather') v = WX_TESTS[Number(v) | 0] || 'auto';
+  // Sucrose peut renvoyer les booléens ou les nombres sous forme de texte ("False", "19") :
+  // sans conversion, "False" serait lu comme vrai et forcerait par exemple le mode test
+  else if (BOOL_PROPS.includes(name)) v = (typeof v === 'string') ? v.trim().toLowerCase() === 'true' : !!v;
+  else if (name !== 'city') v = Number(v);
   window.wallpaperPropertyListener.applyUserProperties({ [name]: { value: v } });
 };
 
