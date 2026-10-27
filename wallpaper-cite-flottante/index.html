@@ -442,6 +442,8 @@ function drawFrame(sky, hour) {
   const sunAlt  = Math.sin(sunAng), moonAlt = Math.sin(moonAng);
   const sunX  = W * (0.5 - Math.cos(sunAng) * 0.38),  sunY  = HZ - sunAlt  * H * 0.50;
   const moonX = W * (0.5 - Math.cos(moonAng) * 0.38), moonY = HZ - moonAlt * H * 0.46;
+  // Recouvrement réel du soleil / de la lune par les nuages (0 = dégagé, 1 = totalement caché)
+  const sunCover = coverAt(sunX, Math.min(sunY, HZ)), moonCover = coverAt(moonX, moonY);
 
   /* --- Ciel --- */
   let g = ctx.createLinearGradient(0, 0, 0, HZ);
@@ -486,7 +488,7 @@ function drawFrame(sky, hour) {
   }
 
   /* --- Halo du soleil : intense à l'horizon, discret en plein jour --- */
-  const glowK = clamp((sunAlt + 0.35) / 0.35, 0, 1) * (1 - clamp(sunAlt, 0, 1) * 0.8) * (1 - wth.cloud * 0.55);
+  const glowK = clamp((sunAlt + 0.35) / 0.35, 0, 1) * (1 - clamp(sunAlt, 0, 1) * 0.8) * (1 - wth.cloud * 0.55) * (1 - sunCover * 0.6);
   if (glowK > 0.01) {
     const gx = sunX, gy = Math.min(sunY, HZ);
     g = ctx.createRadialGradient(gx, gy, 0, gx, gy, W * 0.55);
@@ -500,7 +502,7 @@ function drawFrame(sky, hour) {
   /* --- Soleil --- */
   if (sunAlt > -0.12) {
     const r = H * 0.032;
-    ctx.globalAlpha = 1 - wth.cloud * 0.75;                   // voilé par les nuages
+    ctx.globalAlpha = (1 - wth.cloud * 0.75) * (1 - sunCover * 0.85);   // voilé, puis caché par les nuages
     g = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, r * 5);
     g.addColorStop(0, rgb(mix(sky.glow, [255, 255, 255], 0.6), 1));
     g.addColorStop(0.2, rgb(sky.glow, 0.9));
@@ -591,7 +593,7 @@ function drawFrame(sky, hour) {
 
   // Reflet du soleil / de la lune : traînée scintillante
   const lightSrc = sunAlt > -0.05 && glowK + sunAlt > 0.02
-    ? { x: sunX, k: clamp(sunAlt * 3 + 0.4, 0, 1) * (1 - wth.cloud * 0.7), c: mix(sky.glow, [255, 255, 255], 0.35), r: H * 0.03 }
+    ? { x: sunX, k: clamp(sunAlt * 3 + 0.4, 0, 1) * (1 - wth.cloud * 0.7) * (1 - sunCover * 0.8), c: mix(sky.glow, [255, 255, 255], 0.35), r: H * 0.03 }
     : moonAlt > 0 ? { x: moonX, k: 0.55 * clamp(sky.star * 1.2, 0, 1), c: [200, 215, 255], r: H * 0.026 } : null;
   if (lightSrc && lightSrc.k > 0.02) {
     ctx.globalCompositeOperation = 'lighter';
@@ -623,10 +625,13 @@ function drawFrame(sky, hour) {
 
   /* --- Particules d'ambiance et rayons de lumière --- */
   drawParticles(sky);
+  // Des rayons n'existent que si le soleil est visible : ils s'effacent quand un nuage le recouvre
+  // et disparaissent avec un ciel couvert, la pluie, le brouillard ou l'orage
   const sunRay = clamp((sunAlt + 0.1) / 0.15, 0, 1) * (0.4 + 0.6 * (1 - clamp(sunAlt, 0, 1))) *
-                 (0.6 + 0.4 * wth.cloud) * (1 - wth.rain * 0.7 - wth.fog * 0.3 - wth.storm * 0.5);
+                 (1 - sunCover) * clamp(1 - wth.cloud * 1.15, 0, 1) *
+                 clamp(1 - wth.rain - wth.fog * 0.6 - wth.storm, 0, 1);
   drawRays(sunX, Math.min(sunY, HZ), sunRay, sky.glow, H * 0.95);
-  if (moonAlt > 0) drawRays(moonX, moonY, 0.3 * clamp(sky.star * 1.2, 0, 1) * (1 - wth.rain), [190, 210, 255], H * 0.8);
+  if (moonAlt > 0) drawRays(moonX, moonY, 0.3 * clamp(sky.star * 1.2, 0, 1) * (1 - moonCover) * clamp(1 - wth.cloud * 1.15 - wth.rain, 0, 1), [190, 210, 255], H * 0.8);
 
   /* --- Voile de brume à l'horizon (fond les montagnes dans le lac) --- */
   const bh = H * 0.07;
@@ -850,6 +855,21 @@ function buildClouds() {
     return { x: (r() * 1.4 - 0.2) * W, y: (0.05 + r() * 0.33) * H, sc, ext: n * 40 * sc,
              v: 4 + r() * 8, th: r() * 0.9, blobs };
   });
+}
+// Opacité des nuages au point (x, y) : sert à savoir si le soleil ou la lune est vraiment caché
+function coverAt(x, y) {
+  let cover = 0;
+  for (const c of clouds) {
+    const a = clamp((wth.cloud - c.th) * 3, 0, 1) * 0.9;
+    if (a <= 0.01 || Math.abs(x - c.x) > c.ext || Math.abs(y - c.y) > c.ext) continue;
+    for (const b of c.blobs) {
+      const dx = (x - (c.x + b.dx * c.sc)) / (b.r * c.sc * 0.95);
+      const dy = (y - (c.y + b.dy * c.sc)) / (b.r * c.sc * 0.6);
+      const d = dx * dx + dy * dy;
+      if (d < 1) cover = Math.max(cover, a * (1 - d));
+    }
+  }
+  return Math.min(1, cover * 1.6);
 }
 function drawClouds(sky) {
   if (wth.cloud < 0.03) return;
