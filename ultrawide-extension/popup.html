@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 14px system-ui, sans-serif; width: 260px; margin: 12px; }
+  h1 { font-size: 15px; margin: 0 0 10px; }
+  label { display: block; margin: 6px 0; cursor: pointer; }
+  small { color: #666; display: block; margin-left: 22px; }
+  hr { border: 0; border-top: 1px solid #ddd; margin: 10px 0; }
+</style>
+</head>
+<body>
+  <h1>Vidéo 21:9</h1>
+  <label><input type="radio" name="mode" value="cover"> Zoom (recadrer)
+    <small>Remplit l'écran, sans déformation</small></label>
+  <label><input type="radio" name="mode" value="fill"> Étirer
+    <small>Remplit l'écran, image déformée</small></label>
+  <label><input type="radio" name="mode" value="contain"> Original
+    <small>Bandes noires (désactivé)</small></label>
+  <hr>
+  <label><input type="checkbox" id="fsOnly"> Uniquement en plein écran</label>
+  <script src="popup.js"></script>
+</body>
+</html>

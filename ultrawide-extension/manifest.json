@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Ultrawide 21:9 Video Fit",
+  "version": "1.0.0",
+  "description": "Adapte les vidéos au format 21:9 de votre écran : zoom (recadrage), étirement ou original.",
+  "permissions": ["storage"],
+  "action": { "default_popup": "popup.html", "default_title": "Ultrawide 21:9" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}
