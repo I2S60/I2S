@@ -69,3 +69,30 @@ Commentaire à épingler : « Partie 2 avec 4 nouveaux spots si ce commentaire a
 - Épisode 3 : Marrakech comme un local
 - Épisode 4 : les villages berbères les plus beaux de l'Atlas
 - Épisode 5 : le Maroc à moins de 30 € par jour
+
+---
+
+## Version montée (test « modèles économiques » + infographies)
+
+**Vidéo finale** : 32 s, 1080×1920, 30 fps, −13,7 LUFS — média Higgsfield `28010b24-5f73-4404-9ccc-50d9f0fcdc2f`
+https://d2ol7oe51mr4n9.cloudfront.net/user_2vaFxTf3t0FBlIUkzDAihLyW8Q4/28010b24-5f73-4404-9ccc-50d9f0fcdc2f.mp4
+
+| Étape | Outil | Coût |
+|-------|-------|------|
+| 6 images clés | GPT Image 2.6 (high, 2k) | 12 crédits |
+| 6 animations 5 s | Grok Video 1.5 Lite (720p, upscalé au montage) | ~30 crédits |
+| Voix off (Elodie, +20 % de vitesse) | Seed Audio 1.0 | ~4 crédits |
+| Musique afro-house oud + darbouka | ElevenLabs Music v2 | ~2 crédits |
+| Montage + infographies | Higgsedit (sandbox Higgsfield) + ffmpeg | gratuit |
+
+### Éléments de rétention intégrés
+- Hook visuel : « 4 LIEUX CACHÉS » qui claque + carte du Maroc où les 4 repères s'allument un par un.
+- Flash blanc + zoom « punch » + whoosh à chaque coupe (rupture toutes les 2,7 à 5,5 s).
+- Barre de progression à 4 chapitres en haut : le spectateur voit qu'il reste des lieux.
+- Compteur « TOURISTES 12500 → 0 » avec jauge qui se vide.
+- Par lieu : badge numéroté « n/4 », mini-carte avec repère pulsant (itinéraire), nom + région, info-clé, jauges animées « Affluence » et « Effet waouh » avec compteurs.
+- Sous-titres mot par mot calés sur la voix (Whisper), numéros en doré.
+- CTA vote « Réponds 1, 2, 3 ou 4 » (commentaires) + flèche vers le bouton partage.
+- Boucle : le dernier plan est le plan d'ouverture inversé → la vidéo repart sans couture.
+
+Script du montage : `01-maroc/edit.template.js` (la carte `__MAPS__` est générée avec d3-geo, Maroc + Sahara fusionnés).
