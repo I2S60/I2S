@@ -96,3 +96,17 @@ https://d2ol7oe51mr4n9.cloudfront.net/user_2vaFxTf3t0FBlIUkzDAihLyW8Q4/28010b24-
 - Boucle : le dernier plan est le plan d'ouverture inversé → la vidéo repart sans couture.
 
 Script du montage : `01-maroc/edit.template.js` (la carte `__MAPS__` est générée avec d3-geo, Maroc + Sahara fusionnés).
+
+### Virality Predictor (Higgsfield, 15 premières secondes — l'outil plafonne à 16 s)
+
+| Version | Global | Hook (0–3 s) | Engagement | Potentiel viral | Maintien | Pic |
+|---------|--------|--------------|------------|-----------------|----------|-----|
+| A — ouverture sur l'arche (drone) | 43 | 27 | 35 | 43 | 95 | 8 s |
+| B — ouverture sur le randonneur, sans flash, texte dès l'image 1 | 42 | 25 | 34 | 42 | 98 | 10 s |
+
+Lecture : écart dans le bruit. Le maintien est excellent dans les deux cas ; le creux est toujours à 1–2 s, puis l'activité remonte dès 5 s (compteur, coupe, infographies). La prochaine marge est dans le hook lui-même (texte et rythme), pas dans le plan d'ouverture : couper dès 1,5 s et faire apparaître une infographie avant 2 s.
+
+**Version A retenue pour publication.** Vidéo B gardée pour un test : média `5aa28ef0-70cb-44b3-a0d9-5399bc096f9d`.
+https://d2ol7oe51mr4n9.cloudfront.net/user_2vaFxTf3t0FBlIUkzDAihLyW8Q4/5aa28ef0-70cb-44b3-a0d9-5399bc096f9d.mp4
+
+Coût total du test : 47,5 crédits (1 060 → 1 012,5), Virality Predictor inclus.
