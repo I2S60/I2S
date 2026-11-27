@@ -110,3 +110,5 @@ Lecture : écart dans le bruit. Le maintien est excellent dans les deux cas ; le
 https://d2ol7oe51mr4n9.cloudfront.net/user_2vaFxTf3t0FBlIUkzDAihLyW8Q4/5aa28ef0-70cb-44b3-a0d9-5399bc096f9d.mp4
 
 Coût total du test : 47,5 crédits (1 060 → 1 012,5), Virality Predictor inclus.
+
+Cover (gratuite, image de la vidéo à 2,45 s) : https://d2ol7oe51mr4n9.cloudfront.net/user_2vaFxTf3t0FBlIUkzDAihLyW8Q4/0c2654fd-ace1-48ee-8101-ca4d1502d3c1.jpg

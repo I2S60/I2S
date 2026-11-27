@@ -11,6 +11,21 @@ ce skill **exécute** la production avec les connecteurs Higgsfield et Adobe.
 
 Langue de travail : français. Prompts image/vidéo : anglais (meilleur rendu).
 
+## Mode par défaut : économique, sans validation mobile
+
+L'utilisateur veut dépenser le moins de crédits possible et ne peut pas valider
+de widget ou de demande d'autorisation depuis son mobile. Donc, sauf demande
+contraire :
+- images `gpt_image_2_6` (2 crédits), animation `grok_video_v15_lite` 720p 5 s
+  (5 crédits/plan), voix `seed_audio` (~4), musique `elevenlabs_music_v2` (~2) ;
+- montage, infographies et sous-titres dans `sandbox_exec` (Higgsedit + ffmpeg,
+  aucun crédit), d'après `productions/01-maroc/edit.template.js` ;
+- pas de `tiktok_connect` / `tiktok_prepare_publish` ni de changement
+  d'environnement : livrer des liens directs (MP4 + cover JPG) et la
+  description prête à coller, l'utilisateur publie à la main ;
+- Virality Predictor seulement sur demande (16 s max).
+Test #01 : 47,5 crédits pour une vidéo de 32 s complète.
+
 ## 0. Brief (une seule question groupée si des infos manquent)
 
 Niche · sujet précis · durée (15/30/45/60 s) · ton · objectif (vues, abonnés,
