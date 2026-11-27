@@ -21,3 +21,10 @@ npx hyperframes render . -q high -o renders/maroc-vertical.mp4
 
 Pour régénérer : `npm i d3-geo topojson-client world-atlas` puis
 `node tools/build-geo.mjs . geo.json && node tools/build-vertical.mjs geo.json compositions/maroc.html`.
+
+---
+
+# Forge Virale — studio TikTok
+
+- `tiktok-studio/index.html` — studio web (aussi publié en artifact claude.ai) : 16 niches virales, 6 hooks par vidéo, script minuté, prompts Higgsfield détaillés (image clé + animation), brief Adobe Express, descriptions, hashtags, mots-clés SEO, checklist avec score, créneaux par marché, plan 7 jours et série. Le bouton « Générer avec Claude » écrit un pack sur mesure quand la page est ouverte sur claude.ai ; sinon les modèles intégrés fonctionnent hors ligne.
+- `.claude/skills/tiktok-viral-studio/` — skill Claude Code qui exécute la production : images et vidéos Higgsfield 9:16, voix off, montage, cover Adobe Express, Virality Predictor, brouillon TikTok.

@@ -1,0 +1,916 @@
+<title>Forge Virale</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: régie de montage — colonne brief à gauche, banc de sortie à onglets à droite, aperçu 9:16 en tête de sortie */
+:root{
+  --bg:#EEF0F5; --surface:#FFFFFF; --sunk:#E4E7EF; --ink:#141722; --muted:#5A6073; --line:#D5D9E3;
+  --accent:#E3245C; --accent-ink:#FFFFFF; --accent-soft:#FBE3EA; --cool:#2F49D1;
+  --good:#16865C; --warn:#B7790A; --bad:#C92F37;
+  --f-display:"Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --f-body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1017; --surface:#161924; --sunk:#1D2130; --ink:#ECEEF5; --muted:#99A0B4; --line:#2A2F40;
+  --accent:#FF4D7E; --accent-ink:#1A0610; --accent-soft:#3A1624; --cool:#8EA0FF;
+  --good:#3CCB8F; --warn:#E8B04A; --bad:#FF6B72; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0E1017; --surface:#161924; --sunk:#1D2130; --ink:#ECEEF5; --muted:#99A0B4; --line:#2A2F40;
+  --accent:#FF4D7E; --accent-ink:#1A0610; --accent-soft:#3A1624; --cool:#8EA0FF;
+  --good:#3CCB8F; --warn:#E8B04A; --bad:#FF6B72; color-scheme:dark; }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 48px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-block:20px 16px;max-width:1360px;margin:0 auto}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:30px;font-weight:800}
+.brand h1 b{color:var(--accent)}
+.rec{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rec i{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion: reduce){.rec i{animation:none}}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.wrap{max-width:1360px;margin:0 auto;display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.brief{padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:calc(env(safe-area-inset-top, 0px) + 12px)}
+@media (max-width:900px){.brief{position:static}}
+.brief h2{font-size:17px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.lbl{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+select,input[type=text],textarea{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+textarea{resize:vertical;min-height:64px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.seg{display:flex;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:6px;padding:6px 0;cursor:pointer;font-weight:500;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--surface);box-shadow:0 1px 2px rgb(0 0 0 / .12);color:var(--accent)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:9px 14px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.55;cursor:progress}
+.btn.sm{padding:5px 9px;font-size:12px;font-weight:500}
+.gen{display:grid;grid-template-columns:1fr;gap:8px}
+.ai-note{font-size:12px;color:var(--muted)}
+.status{font-size:12px;color:var(--muted);min-height:18px}
+.status.err{color:var(--bad)}
+
+.recent{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.recent button{text-align:left;border:0;background:transparent;padding:4px 0;cursor:pointer;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent button:hover{color:var(--ink)}
+
+/* Sortie */
+.out{display:flex;flex-direction:column;gap:16px;min-width:0}
+.hero{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px;padding:18px}
+@media (max-width:560px){.hero{grid-template-columns:minmax(0,1fr)}.phone{margin:0 auto}}
+.phone{width:200px;max-width:100%;aspect-ratio:9/16;border-radius:22px;position:relative;overflow:hidden;border:6px solid var(--ink);background:#222}
+.phone .bgfx{position:absolute;inset:0}
+.phone .ov{position:absolute;left:8%;right:18%;top:17%;font-family:var(--f-display);font-weight:800;font-size:17px;line-height:1.1;text-align:center;color:#fff;text-shadow:0 2px 0 rgb(0 0 0 / .55),0 0 12px rgb(0 0 0 / .45)}
+.phone .ov span{background:rgb(0 0 0 / .35);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 5px;border-radius:4px}
+.zone-b{position:absolute;left:0;right:0;bottom:0;height:22%;background:repeating-linear-gradient(135deg,rgb(255 255 255 / .16) 0 6px,transparent 6px 12px);border-top:1px dashed rgb(255 255 255 / .6)}
+.zone-r{position:absolute;top:38%;right:0;bottom:22%;width:15%;background:repeating-linear-gradient(135deg,rgb(255 255 255 / .16) 0 6px,transparent 6px 12px);border-left:1px dashed rgb(255 255 255 / .6)}
+.zone-t{position:absolute;left:0;right:0;top:0;height:9%;background:repeating-linear-gradient(135deg,rgb(255 255 255 / .12) 0 6px,transparent 6px 12px);border-bottom:1px dashed rgb(255 255 255 / .45)}
+.zlabel{position:absolute;font-family:var(--f-mono);font-size:8px;color:#fff;opacity:.85;letter-spacing:.04em}
+.tc{position:absolute;top:10%;left:8px;font-family:var(--f-mono);font-size:9px;color:#fff;background:rgb(0 0 0 / .45);padding:1px 4px;border-radius:3px}
+.hero-info{display:flex;flex-direction:column;gap:12px;min-width:0}
+.eyebrow{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.hero-info h2{font-size:26px;line-height:1.15}
+.meta{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;border-radius:999px;padding:3px 10px;background:var(--sunk);border:1px solid var(--line);color:var(--muted)}
+.pill.src{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.score{display:flex;align-items:center;gap:14px}
+.gauge{width:64px;height:64px;flex:none}
+.score b{font-family:var(--f-display);font-size:15px}
+.score p{margin:0;font-size:12px;color:var(--muted)}
+
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 10px;scrollbar-width:thin}
+.tabs button{border:0;background:transparent;padding:12px 12px 10px;cursor:pointer;font-weight:600;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabpanel{padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sec-h h3{font-size:17px}
+.hint{font-size:13px;color:var(--muted);margin:0;max-width:72ch}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.item{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;background:var(--surface)}
+.item.best{border-color:var(--accent)}
+.item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.tag{font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--cool)}
+.item .say{font-size:16px;font-weight:600;line-height:1.35}
+.item .scr{font-size:13px;color:var(--muted)}
+.item .why{font-size:12px;color:var(--muted)}
+.star{color:var(--accent);font-weight:700;font-size:11px;font-family:var(--f-mono)}
+
+.tl{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--sunk);font-weight:600}
+td.t{font-family:var(--f-mono);font-size:12px;white-space:nowrap;color:var(--accent);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+
+pre.prompt{margin:0;font-family:var(--f-mono);font-size:12px;line-height:1.55;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word}
+.neg{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--f-mono);font-size:12px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{display:flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px}
+.sw i{width:22px;height:22px;border-radius:5px;border:1px solid var(--line);display:inline-block}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.ht{display:flex;flex-wrap:wrap;gap:6px}
+.ht span{font-family:var(--f-mono);font-size:12px;border-radius:6px;padding:3px 8px;background:var(--sunk);border:1px solid var(--line)}
+.ht span.b{border-color:var(--cool);color:var(--cool)}
+.ht span.n{border-color:var(--accent);color:var(--accent)}
+.checks{display:flex;flex-direction:column;gap:2px}
+.checks label{display:flex;gap:10px;align-items:flex-start;padding:7px 4px;border-radius:6px;cursor:pointer;font-size:13px}
+.checks label:hover{background:var(--sunk)}
+.checks input{margin-top:3px;accent-color:var(--accent)}
+.checks small{color:var(--muted);font-family:var(--f-mono);margin-left:auto;font-size:11px;white-space:nowrap}
+.cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.day{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;font-size:12px}
+.day b{font-family:var(--f-display);font-size:14px}
+.day .when{font-family:var(--f-mono);color:var(--accent);font-size:11px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom, 0px) + 20px);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:20}
+.foot{max-width:1360px;margin:20px auto 0;font-size:12px;color:var(--muted)}
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Forge <b>Virale</b></h1>
+    <span class="rec"><i></i>studio TikTok · Higgsfield × Adobe Express</span>
+  </div>
+  <div class="top-actions">
+    <button class="btn sm ghost" id="copyAll" type="button">Copier le pack</button>
+    <button class="btn sm" id="dlMd" type="button" hidden>Télécharger (.md)</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="panel brief" aria-label="Brief vidéo">
+    <h2>Brief de la vidéo</h2>
+    <div class="field">
+      <label for="niche">Niche</label>
+      <select id="niche"></select>
+    </div>
+    <div class="field">
+      <label for="subject">Sujet précis</label>
+      <input type="text" id="subject" autocomplete="off">
+      <div class="chips" id="angleChips" aria-label="Sujets qui marchent dans cette niche"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="dur">Durée</label>
+        <select id="dur">
+          <option value="15">15 s</option>
+          <option value="30" selected>30 s</option>
+          <option value="45">45 s</option>
+          <option value="60">60 s</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tone">Ton</label>
+        <select id="tone">
+          <option value="mystere">Mystérieux</option>
+          <option value="energie">Énergique</option>
+          <option value="edu" selected>Éducatif</option>
+          <option value="drole">Drôle</option>
+          <option value="inspi">Inspirant</option>
+          <option value="choc">Contre-courant</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="goal">Objectif</label>
+        <select id="goal">
+          <option value="vues" selected>Portée (vues)</option>
+          <option value="abonnes">Abonnés</option>
+          <option value="engagement">Commentaires</option>
+          <option value="ventes">Ventes / lien bio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="market">Marché</label>
+        <select id="market">
+          <option value="fr" selected>France / Belgique</option>
+          <option value="ma">Maroc / Maghreb</option>
+          <option value="qc">Québec</option>
+          <option value="intl">International (EN)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl" id="langLbl">Langue du contenu</span>
+      <div class="seg" role="group" aria-labelledby="langLbl">
+        <button type="button" data-lang="fr" aria-pressed="true">Français</button>
+        <button type="button" data-lang="en" aria-pressed="false">English</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="format">Format de production</label>
+      <select id="format">
+        <option value="faceless" selected>Faceless IA (Higgsfield + voix off)</option>
+        <option value="facecam">Face caméra + B-roll IA</option>
+        <option value="text">Texte à l'écran + musique</option>
+        <option value="ugc">Pub UGC produit (Marketing Studio)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="extra">Contexte (optionnel)</label>
+      <textarea id="extra" placeholder="Ton produit, ta cible, une anecdote, ce qui a déjà marché…"></textarea>
+    </div>
+    <div class="gen">
+      <button class="btn primary" id="genAI" type="button" hidden>Générer avec Claude</button>
+      <button class="btn" id="genLocal" type="button">Générer depuis les modèles</button>
+      <p class="ai-note" id="aiNote">Les modèles intégrés marchent hors ligne. Ouvre la page sur claude.ai pour que Claude écrive un pack sur mesure.</p>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="recent" id="recent" hidden>
+      <span class="lbl">Packs récents</span>
+    </div>
+  </aside>
+
+  <section class="out" aria-label="Pack vidéo">
+    <div class="panel hero">
+      <div class="phone" aria-label="Aperçu de la première image 9:16 avec les zones d'interface TikTok">
+        <div class="bgfx" id="phoneBg"></div>
+        <div class="zone-t"></div><div class="zone-r"></div><div class="zone-b"></div>
+        <span class="zlabel" style="left:6px;bottom:6px">UI · légende</span>
+        <span class="zlabel" style="right:3px;top:39%;writing-mode:vertical-rl">UI · boutons</span>
+        <span class="tc">0:00</span>
+        <div class="ov" id="phoneText"></div>
+      </div>
+      <div class="hero-info">
+        <span class="eyebrow" id="heroEyebrow"></span>
+        <h2 id="heroHook"></h2>
+        <div class="meta" id="heroMeta"></div>
+        <div class="score">
+          <svg class="gauge" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r="27" fill="none" stroke="var(--sunk)" stroke-width="7"/>
+            <circle id="gArc" cx="32" cy="32" r="27" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="0 170" transform="rotate(-90 32 32)"/>
+            <text id="gTxt" x="32" y="37" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="16" fill="var(--ink)">0</text>
+          </svg>
+          <div><b id="scoreLbl">Score de préparation</b><p id="scoreHint">Coche la checklist dans l'onglet Publication.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="panels"></div>
+    </div>
+  </section>
+</main>
+<p class="foot">Repères de publication et hashtags : points de départ à valider avec tes TikTok Analytics. Active l'étiquette « contenu généré par IA » quand tes visuels sont réalistes.</p>
+
+<script>
+"use strict";
+/* ---------- utilitaires ---------- */
+const $ = (s, r=document) => r.querySelector(s);
+function h(tag, attrs, ...kids){
+  const el = document.createElement(tag);
+  if (attrs) for (const [k,v] of Object.entries(attrs)){
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "style") el.setAttribute("style", v);
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const c of kids.flat()){ if (c == null || c === false) continue; el.append(c instanceof Node ? c : document.createTextNode(String(c))); }
+  return el;
+}
+function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+function shuffle(r, arr){ const a = arr.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "");
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const fmtT = s => `0:${String(Math.round(s)).padStart(2,"0")}`.replace(/^0:(\d{3})/, "1:$1");
+function mmss(s){ s = Math.round(s); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let toastTimer;
+function toast(msg){ let t = $(".toast"); if (!t){ t = h("div",{class:"toast",role:"status"}); document.body.append(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ t.hidden = true; }, 1800); }
+async function copy(text, btn){
+  try { await navigator.clipboard.writeText(text); toast("Copié"); }
+  catch {
+    const ta = h("textarea",{style:"position:fixed;opacity:0"}); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); toast("Copié"); } catch { toast("Sélectionne le texte puis copie-le"); }
+    ta.remove();
+  }
+}
+const copyBtn = (getText, label="Copier") => h("button",{class:"btn sm",type:"button",onclick:(e)=>copy(typeof getText==="function"?getText():getText, e.currentTarget)},label);
+
+/* ---------- données : niches ---------- */
+const QUALITY = "ultra-detailed textures, photorealistic materials with natural micro-imperfections, crisp focus on the subject, shallow depth of field with creamy bokeh, volumetric atmosphere, high dynamic range, professional color science, 8K detail, award-winning cinematography";
+const COMPO = "vertical 9:16 composition, clean negative space in the upper third for a text overlay, key subject kept out of the bottom 20% and the right 15% (TikTok UI zones)";
+const NEG = "blurry, low resolution, watermark, logo, random text, garbled letters, extra fingers, deformed hands, distorted face, plastic skin, oversaturated, jpeg artifacts, frame borders, letterboxing, duplicate subject";
+
+const NICHES = {
+ faits:{label:"Faits fous & le saviez-vous",
+  fr:{A:"les curieux",R:"briller en soirée",X:"croire tout ce qu'on t'a appris à l'école",T:"30 secondes"},
+  en:{A:"curious people",R:"sound smarter than everyone at dinner",X:"believing everything you learned in school",T:"30 seconds"},
+  angles:["le cerveau humain","les abysses de l'océan","l'Égypte ancienne","les animaux les plus étranges","l'espace profond"],
+  tags:{n:["#lesaviezvous","#culturegenerale","#faitsinteressants","#apprendresurtiktok"],e:["#didyouknow","#facts","#learnontiktok"],m:["#faitdujour","#incroyablemaisvrai","#curiosite"]},
+  scenes:["a dramatic macro close-up slowly revealing a hidden detail nobody notices","a vast surreal landscape with a tiny human silhouette for scale","an antique map and softly glowing artifacts scattered on a dark walnut desk","a scientist's gloved hands holding a glowing specimen inside a dark lab"],
+  look:"National Geographic documentary meets cinematic sci-fi",light:"moody low-key lighting, one warm key light and a cool blue rim light",grade:"teal and amber grade with deep inky blacks",
+  palette:["#0B1D2E","#F2B134","#FFFFFF"],fonts:"Anton (titre) + Inter SemiBold (sous-titres)",sound:"nappe cinématique « mystery build-up », montée avant la révélation",amb:"deep cinematic drone, subtle whoosh on each cut"},
+ argent:{label:"Argent & business en ligne",
+  fr:{A:"ceux qui veulent un revenu en plus",R:"tes premiers 1 000 € en ligne",X:"dépenser avant d'épargner",T:"30 jours"},
+  en:{A:"people who want a side income",R:"your first $1,000 online",X:"spending before you save",T:"30 days"},
+  angles:["les side hustles qui marchent vraiment","la règle des 50/30/20","investir avec 50 € par mois","vendre des produits digitaux","les erreurs d'argent à 20 ans"],
+  tags:{n:["#argent","#financespersonnelles","#businessenligne","#entrepreneur"],e:["#moneytips","#sidehustle","#personalfinance"],m:["#libertefinanciere","#investirpourlesnuls","#revenupassif"]},
+  scenes:["a sleek minimalist desk with a laptop showing rising charts, neat stacks of cash and a cup of coffee","a young entrepreneur walking confidently through a glass-and-steel business district","extreme close-up of hands counting crisp banknotes in slow motion","a smartphone on a marble table lighting up with a cascade of payment notifications"],
+  look:"premium fintech commercial, clean and aspirational",light:"soft daylight from a large window with crisp specular reflections",grade:"clean neutral whites with emerald green accents",
+  palette:["#0E3B2E","#22C55E","#F7F7F2"],fonts:"Montserrat ExtraBold + Inter",sound:"beat lo-fi motivant ou phonk léger",amb:"subtle cash register ding, soft upbeat beat",
+  care:"Pas de promesse de gains garantis : TikTok limite la portée des contenus financiers trompeurs."},
+ ia:{label:"IA & tech hacks",
+  fr:{A:"ceux qui veulent gagner du temps",R:"gagner 2 heures par jour",X:"utiliser l'IA comme Google",T:"5 minutes"},
+  en:{A:"people who want their time back",R:"save 2 hours a day",X:"using AI like a search engine",T:"5 minutes"},
+  angles:["les outils IA gratuits méconnus","les prompts qui changent tout","automatiser son boulot","les fonctions cachées du smartphone","créer des vidéos avec l'IA"],
+  tags:{n:["#intelligenceartificielle","#ia","#astucetech","#productivite"],e:["#ai","#aitools","#techtok"],m:["#outilsia","#astuceia","#techfrance"]},
+  scenes:["a futuristic workspace with holographic interfaces floating above a glass desk","extreme close-up of a glowing screen reflected in a person's eyes","a robotic hand and a human hand almost touching, surrounded by drifting light particles","a neon-lit city at night seen through a rain-streaked window, screens everywhere"],
+  look:"sleek cyber-minimal tech commercial",light:"cyan and magenta neon practicals with glossy reflections",grade:"cool blues with electric highlights",
+  palette:["#0A0F2C","#4F7CFF","#E6F0FF"],fonts:"Space Grotesk Bold + Inter",sound:"électro minimale / synthwave",amb:"digital glitch accents, soft synth pad"},
+ mindset:{label:"Motivation & mindset",
+  fr:{A:"ceux qui veulent changer de vie",R:"une discipline de fer",X:"attendre d'être motivé",T:"90 jours"},
+  en:{A:"people ready to change their life",R:"iron discipline",X:"waiting to feel motivated",T:"90 days"},
+  angles:["la routine du matin des gens qui réussissent","arrêter de procrastiner","discipline contre motivation","les habitudes qui changent une vie","rebondir après un échec"],
+  tags:{n:["#motivation","#mindset","#developpementpersonnel","#discipline"],e:["#motivation","#selfimprovement","#mindset"],m:["#routinedumatin","#devenirmeilleur","#confianceensoi"]},
+  scenes:["a lone runner on a misty mountain ridge at sunrise","a person facing their reflection in a dark mirror, jaw set with determination","slow-motion boxing training in a gritty gym, dust glowing in shafts of light","a silhouette at the edge of a rooftop overlooking a city at dawn"],
+  look:"epic sports documentary",light:"hard sunrise backlight with god rays",grade:"desaturated with warm orange highlights and crushed blacks",
+  palette:["#111111","#FF6B1A","#F5F5F5"],fonts:"Bebas Neue + Inter",sound:"piano épique + percussions, ou discours motivant",amb:"heavy breathing, deep cinematic impacts"},
+ fitness:{label:"Fitness & transformation",
+  fr:{A:"ceux qui veulent se remettre en forme",R:"des résultats visibles",X:"faire une heure de cardio par jour",T:"4 semaines"},
+  en:{A:"people getting back in shape",R:"visible results",X:"doing an hour of cardio every day",T:"4 weeks"},
+  angles:["les exercices à faire chez soi","manger plus de protéines sans effort","les erreurs de débutant en salle","le programme 20 minutes","corriger sa posture au bureau"],
+  tags:{n:["#fitness","#musculation","#sportalamaison","#transformation"],e:["#fitness","#gymtok","#workout"],m:["#fitnessfrance","#coachsportif","#motivationsport"]},
+  scenes:["an athlete in an explosive box jump inside a sunlit concrete gym","close-up of chalked hands gripping a knurled barbell, beads of sweat","a colorful high-protein meal prep shot top-down on a marble counter","a runner tying shoelaces on wet city pavement at blue hour"],
+  look:"premium athletic performance commercial",light:"high-contrast side light that sculpts muscles and sweat highlights",grade:"punchy contrast, warm skin tones",
+  palette:["#101820","#FEE715","#FFFFFF"],fonts:"Anton + Inter",sound:"phonk ou drill énergique",amb:"weights clanking, heavy bass hits",
+  care:"Évite les promesses de perte de poids chiffrées et les avant/après retouchés."},
+ cuisine:{label:"Recettes rapides & food",
+  fr:{A:"ceux qui n'ont pas le temps de cuisiner",R:"un repas de chef en 10 minutes",X:"acheter des plats tout prêts",T:"10 minutes"},
+  en:{A:"people with no time to cook",R:"a restaurant-level meal in 10 minutes",X:"buying ready meals",T:"10 minutes"},
+  angles:["les recettes à 3 ingrédients","le meal prep de la semaine","la cuisine marocaine revisitée","les desserts sans four","les erreurs avec les pâtes"],
+  tags:{n:["#recette","#cuisine","#recettefacile","#food"],e:["#recipe","#foodtok","#easyrecipe"],m:["#recetterapide","#cuisinemaison","#faitmaison"]},
+  scenes:["a sizzling cast-iron pan in extreme close-up, steam and oil droplets catching the light","top-down shot of vibrant fresh ingredients arranged on a rustic olive-wood board","slow-motion glossy sauce drizzling over a perfectly plated dish","a cozy kitchen bathed in warm morning light, herbs on the windowsill"],
+  look:"high-end food commercial with cinematic macro",light:"soft warm backlight that makes steam glow",grade:"warm, rich and appetizing saturation",
+  palette:["#3B1F0E","#FF8A3D","#FFF4E6"],fonts:"Poppins ExtraBold + Inter",sound:"ASMR de cuisson + beat léger",amb:"sizzling and knife-chopping ASMR"},
+ voyage:{label:"Voyage & lieux cachés",
+  fr:{A:"les voyageurs",R:"voyager deux fois moins cher",X:"réserver au dernier moment",T:"un week-end"},
+  en:{A:"travelers",R:"travel for half the price",X:"booking at the last minute",T:"one weekend"},
+  angles:["les plus beaux endroits cachés du Maroc","les pays où la vie coûte le moins cher","les erreurs à éviter en voyage","Marrakech comme un local","les spots secrets d'Europe"],
+  tags:{n:["#voyage","#travel","#lieuxsecrets","#maroc"],e:["#travel","#traveltok","#hiddengems"],m:["#voyagepascher","#bucketlist","#visitmorocco"]},
+  scenes:["a drone gliding over a hidden turquoise lagoon framed by sheer cliffs","a traveler walking through a vibrant medina alley strung with brass lanterns","golden-hour desert dunes with a lone camel caravan casting long shadows","a hidden rooftop terrace at sunset overlooking an ancient city"],
+  look:"travel film shot on large-format cinema camera, pure wanderlust",light:"golden-hour sunlight with long soft shadows",grade:"warm cinematic teal-orange",
+  palette:["#073B4C","#FFD166","#FFFFFF"],fonts:"Bebas Neue + Inter",sound:"afro-house ou chill tendance",amb:"wind, distant city murmur, soft music"},
+ histoire:{label:"Histoire & mystères",
+  fr:{A:"les passionnés d'énigmes",R:"comprendre un mystère vieux de 2 000 ans",X:"croire la version officielle sans vérifier",T:"60 secondes"},
+  en:{A:"mystery lovers",R:"understand a 2,000-year-old mystery",X:"accepting the official story without checking",T:"60 seconds"},
+  angles:["les civilisations disparues","les objets impossibles","les énigmes jamais résolues","les secrets des pharaons","les cartes anciennes inexpliquées"],
+  tags:{n:["#histoire","#mystere","#enigme","#archeologie"],e:["#history","#mystery","#unsolved"],m:["#mysteresnonresolus","#histoirevraie","#civilisation"]},
+  scenes:["a torch-lit underground chamber covered in ancient carvings","dust floating in a single beam of light above a forgotten artifact","an epic aerial view of ruins emerging from morning fog","an explorer's leather journal with ink sketches under candlelight"],
+  look:"dark historical documentary with adventure-film atmosphere",light:"flickering torchlight with deep shadows",grade:"sepia golds against cold shadows",
+  palette:["#1C1410","#C9A227","#EDE3D1"],fonts:"Cinzel Bold + Inter",sound:"nappe mystérieuse avec chœurs",amb:"echoing chamber, low drone"},
+ psycho:{label:"Psychologie & relations",
+  fr:{A:"ceux qui veulent comprendre les gens",R:"lire les gens comme un livre",X:"trop te justifier",T:"une conversation"},
+  en:{A:"people who want to read others",R:"read people like a book",X:"over-explaining yourself",T:"one conversation"},
+  angles:["les signes qu'une personne ment","les astuces de psychologie sociale","les red flags en couple","devenir plus charismatique","le langage corporel"],
+  tags:{n:["#psychologie","#relation","#developpementpersonnel","#couple"],e:["#psychology","#psychologyfacts","#relationships"],m:["#langagecorporel","#psychologiefacts","#confiance"]},
+  scenes:["an intimate close-up of two people talking across a café table, subtle micro-expressions","a face half in shadow, eyes looking straight into the lens","a crowded street in slow motion with a single person in sharp focus","a chessboard in dramatic light suggesting mind games"],
+  look:"intimate indie film",light:"soft window light with gentle falloff",grade:"muted pastel tones with fine film grain",
+  palette:["#2D1B3D","#E8A0BF","#FFF5F8"],fonts:"DM Serif Display + Inter",sound:"piano doux ou lo-fi émotion",amb:"soft room tone, café murmur"},
+ beaute:{label:"Beauté & skincare",
+  fr:{A:"ceux qui prennent soin de leur peau",R:"une peau éclatante",X:"empiler dix produits",T:"7 jours"},
+  en:{A:"skincare lovers",R:"glowing skin",X:"layering ten products",T:"7 days"},
+  angles:["la routine skincare minimaliste","les produits pas chers qui valent le luxe","les erreurs de maquillage","les rituels naturels","le glow up en 30 jours"],
+  tags:{n:["#skincare","#beaute","#routinebeaute","#makeup"],e:["#skincare","#beautytok","#glowup"],m:["#skincareroutine","#astucebeaute","#peaunette"]},
+  scenes:["a macro shot of a single serum drop landing on dewy skin","a luxurious vanity with glass bottles catching soft light","a model's dewy face in soft focus with fine water droplets","a minimalist bathroom shelf of pastel products in morning light"],
+  look:"luxury beauty campaign",light:"large soft beauty dish with glowing highlights",grade:"soft pastel, clean whites, peachy skin",
+  palette:["#F8E1E7","#C2185B","#FFFFFF"],fonts:"Playfair Display + Inter",sound:"pop douce tendance",amb:"gentle water drops, airy pad"},
+ luxe:{label:"Luxe & lifestyle",
+  fr:{A:"ceux qui rêvent grand",R:"le train de vie des 1 %",X:"confondre être riche et dépenser",T:"24 heures"},
+  en:{A:"people who dream big",R:"the lifestyle of the top 1%",X:"confusing being rich with spending",T:"24 hours"},
+  angles:["une journée dans la vie d'un milliardaire","les objets les plus chers du monde","les hôtels les plus fous","les supercars","les habitudes des ultra-riches"],
+  tags:{n:["#luxe","#lifestyle","#millionnaire","#luxury"],e:["#luxury","#luxurylifestyle","#billionaire"],m:["#richlife","#luxurytravel","#dreamlife"]},
+  scenes:["a supercar gliding along a coastal road at sunset, drone follow shot","a penthouse with floor-to-ceiling windows over a glittering night skyline","a private jet cabin with champagne and soft amber lighting","a close-up of a luxury watch as a light sweep travels across the dial"],
+  look:"high-end luxury commercial",light:"glossy reflections and warm practicals",grade:"rich blacks with gold highlights",
+  palette:["#0A0A0A","#D4AF37","#F5F5F5"],fonts:"Cormorant Garamond Bold + Inter",sound:"trap luxueuse ou deep house",amb:"engine roar, ice clinking in a glass"},
+ satisfying:{label:"Satisfying & ASMR visuel",
+  fr:{A:"ceux qui veulent décompresser",R:"un moment hypnotique",X:"scroller sans fin",T:"15 secondes"},
+  en:{A:"people who need to unwind",R:"a hypnotic moment",X:"doom-scrolling",T:"15 seconds"},
+  angles:["le sable kinétique","les machines industrielles hypnotiques","la résine époxy","le nettoyage extrême","les dominos géants"],
+  tags:{n:["#satisfying","#asmr","#oddlysatisfying","#relaxant"],e:["#satisfying","#oddlysatisfying","#asmr"],m:["#satisfyingvideo","#asmrsounds","#relax"]},
+  scenes:["kinetic sand sliced with a blade in perfect macro detail","molten swirling resin poured into a mold in slow motion","a precision machine cutting soap into perfect cubes","a mesmerizing domino chain reaction across a white floor"],
+  look:"clean macro product cinematography",light:"soft even studio light without harsh shadows",grade:"vivid pastel saturation",
+  palette:["#FDE2E4","#6C5CE7","#FFFFFF"],fonts:"Poppins Bold + Inter",sound:"son ASMR natif uniquement, pas de musique",amb:"crisp ASMR crunch and slicing sounds"},
+ pov:{label:"Humour, POV & sketchs",
+  fr:{A:"tout le monde",R:"pleurer de rire",X:"prendre la vie trop au sérieux",T:"une journée"},
+  en:{A:"everyone",R:"cry laughing",X:"taking life too seriously",T:"one day"},
+  angles:["ton premier jour de travail","les types de clients au restaurant","quand ta mère découvre TikTok","les élèves pendant un contrôle","les vacances au bled"],
+  tags:{n:["#humour","#pov","#drole","#sketch"],e:["#comedy","#pov","#funny"],m:["#humourfrancais","#relatable","#tropvrai"]},
+  scenes:["a sitcom-style living room with exaggerated characters frozen mid-reaction","an office worker staring into the camera in disbelief","a classroom erupting into slow-motion chaos","a family dinner table where everyone turns to look at the camera at once"],
+  look:"bright sitcom comedy",light:"bright high-key lighting",grade:"saturated and cheerful",
+  palette:["#FFE14D","#1A1A1A","#FFFFFF"],fonts:"Archivo Black + Inter",sound:"son tendance ou effet comique",amb:"comedic stingers, record scratch"},
+ animaux:{label:"Animaux",
+  fr:{A:"les amoureux des animaux",R:"un animal plus heureux",X:"donner tes restes à ton chien",T:"une semaine"},
+  en:{A:"animal lovers",R:"a happier pet",X:"feeding your dog table scraps",T:"one week"},
+  angles:["les comportements bizarres des chats","les animaux les plus intelligents","les erreurs des propriétaires de chiens","les bébés animaux","les animaux rares du désert"],
+  tags:{n:["#animaux","#chat","#chien","#animauxdrole"],e:["#animals","#cattok","#dogsoftiktok"],m:["#animauxmignons","#petlover","#chatdrole"]},
+  scenes:["an adorable kitten tilting its head in extreme close-up, huge glossy eyes","a golden retriever sprinting through a sunlit meadow in slow motion","a rare fennec fox peeking out from a dune at sunset","a wise owl slowly turning its head in a misty forest"],
+  look:"wildlife documentary",light:"soft natural backlight with a rim light on the fur",grade:"warm natural tones with rich greens",
+  palette:["#264653","#E9C46A","#FFFFFF"],fonts:"Fredoka Bold + Inter",sound:"musique mignonne tendance",amb:"nature sounds, soft paws on grass"},
+ foot:{label:"Football & sport",
+  fr:{A:"les fans de foot",R:"comprendre le génie des légendes",X:"ne regarder que les résumés",T:"90 minutes"},
+  en:{A:"football fans",R:"understand the genius of the legends",X:"only watching highlights",T:"90 minutes"},
+  angles:["les buts les plus fous de l'histoire","les secrets d'entraînement des pros","la Coupe du monde 2030 au Maroc","les transferts les plus chers","les gestes techniques à apprendre"],
+  tags:{n:["#football","#foot","#soccer","#maroc"],e:["#football","#soccer","#footballtiktok"],m:["#footballfrance","#skills","#dimaMaghrib"]},
+  scenes:["a stadium at night under blazing floodlights, smoke and a roaring crowd","a slow-motion close-up of a boot striking a ball, water droplets exploding","a lone player juggling a ball on a rooftop at sunset","a goalkeeper diving at full stretch, frozen mid-air"],
+  look:"elite football broadcast promo",light:"stadium floodlights with anamorphic lens flares",grade:"high contrast with vibrant pitch greens",
+  palette:["#0B3D20","#FFFFFF","#E63946"],fonts:"Bebas Neue + Inter",sound:"hymne épique ou drill",amb:"crowd roar, ball impact"},
+ etudes:{label:"Études & productivité",
+  fr:{A:"les étudiants",R:"retenir deux fois plus vite",X:"relire tes cours en boucle",T:"une soirée"},
+  en:{A:"students",R:"remember twice as fast",X:"rereading your notes over and over",T:"one evening"},
+  angles:["réviser efficacement en une nuit","les techniques de mémorisation","organiser sa semaine","les applis gratuites pour étudiants","réussir un oral"],
+  tags:{n:["#etudiant","#revision","#productivite","#studytok"],e:["#studytok","#studytips","#productivity"],m:["#methodedetravail","#bac","#organisation"]},
+  scenes:["a cozy desk at night with a warm lamp, open notebooks and a steaming mug","a timelapse of hands writing colorful structured notes","a grand library with towering shelves and dust floating in sunbeams","a focused student wearing headphones, city lights blurred through the window"],
+  look:"aesthetic cozy study-with-me",light:"warm desk lamp with soft blue ambient light from the window",grade:"warm cozy tones with soft film grain",
+  palette:["#22303C","#F4A261","#FAF3E0"],fonts:"Poppins Bold + Inter",sound:"lo-fi study beat",amb:"pencil scratching, rain on the window"}
+};
+
+/* ---------- données : hooks ---------- */
+const HOOKS = [
+ {type:"Curiosité",tones:["mystere","edu"],
+  fr:["Personne ne te parle de ça, mais {S} cache un détail fou.","Personne n'en parle…"],
+  en:["Nobody talks about this, but {S} hides something wild.","Nobody talks about this…"],
+  why:"Ouvre une boucle d'information : le cerveau veut la refermer, donc il reste."},
+ {type:"Liste chiffrée",tones:["edu","energie"],
+  fr:["{N} choses sur {S} que 99 % des gens ignorent.","{N} secrets sur {S}"],
+  en:["{N} things about {S} that 99% of people don't know.","{N} secrets about {S}"],
+  why:"Le chiffre promet une durée claire et pousse à attendre le dernier point."},
+ {type:"Contre-courant",tones:["choc","energie"],
+  fr:["Arrête de {X}. C'est exactement ce qui te bloque.","Arrête de faire ça."],
+  en:["Stop {X}. It's exactly what's holding you back.","Stop doing this."],
+  why:"Contredit une croyance : réaction immédiate, et beaucoup de commentaires."},
+ {type:"Résultat d'abord",tones:["inspi","energie"],
+  fr:["Comment obtenir {R} en {T}, sans {X}.","{R} en {T}"],
+  en:["How to get {R} in {T} without {X}.","{R} in {T}"],
+  why:"Montre la destination dès la première seconde. Marche très bien en tuto."},
+ {type:"POV",tones:["drole","inspi"],
+  fr:["POV : tu découvres enfin la vérité sur {S}.","POV : tu découvres enfin…"],
+  en:["POV: you finally find out the truth about {S}.","POV: you finally find out…"],
+  why:"Le spectateur se projette et vit la scène au lieu de la regarder."},
+ {type:"Avertissement",tones:["choc","mystere"],
+  fr:["Ne fais surtout pas ça avec {S} avant d'avoir vu cette vidéo.","Ne fais surtout pas ça"],
+  en:["Don't do this with {S} until you've watched this.","Don't do this"],
+  why:"La peur de se tromper retient plus fort que l'envie d'apprendre."},
+ {type:"Défi",tones:["drole","edu"],
+  fr:["Je parie que tu ne connais pas ce détail sur {S}.","Je parie que tu ne sais pas ça"],
+  en:["I bet you don't know this about {S}.","Bet you didn't know this"],
+  why:"Pique l'ego : on regarde pour prouver qu'on savait, puis on commente."},
+ {type:"Interpellation",tones:["edu","inspi"],
+  fr:["Si tu fais partie de {A}, cette vidéo va te faire gagner un temps fou.","Si tu es concerné, reste"],
+  en:["If you're one of {A}, this will save you so much time.","If this is you, stay"],
+  why:"Qualifie l'audience : l'algorithme apprend vite à qui montrer la vidéo."},
+ {type:"Histoire",tones:["mystere","inspi"],
+  fr:["Il y a un truc sur {S} qu'on m'a caché pendant des années.","On m'a caché ça pendant des années"],
+  en:["There's something about {S} nobody told me for years.","Nobody told me this for years"],
+  why:"Ouverture narrative : on veut connaître la suite de l'histoire."},
+ {type:"Vrai ou faux",tones:["edu","choc"],
+  fr:["Vrai ou faux : tout ce que tu sais sur {S} est faux ?","Vrai ou faux ?"],
+  en:["True or false: everything you know about {S} is wrong?","True or false?"],
+  why:"Une question binaire déclenche une réponse mentale, puis un commentaire."},
+ {type:"Express",tones:["energie","edu"],
+  fr:["{S} expliqué en {D} secondes chrono.","{S} en {D} s"],
+  en:["{S} explained in {D} seconds flat.","{S} in {D}s"],
+  why:"Contrat clair et court : faible risque pour le spectateur, forte complétion."},
+ {type:"Erreur courante",tones:["edu","choc"],
+  fr:["La plus grosse erreur sur {S} ? Presque tout le monde la fait.","L'erreur que tout le monde fait"],
+  en:["The biggest mistake with {S}? Almost everyone makes it.","The mistake everyone makes"],
+  why:"Chacun se demande s'il la fait. Très bon taux de visionnage complet."}
+];
+const PATTERN = [
+ "Image 1 : le résultat final ou la scène la plus forte, puis retour au début",
+ "Zoom rapide (crash zoom) sur le sujet en 0,3 s avec un whoosh",
+ "Un objet entre brutalement dans le champ dès la première image",
+ "Texte qui claque à l'écran mot par mot, synchronisé sur un impact sonore",
+ "Mouvement de caméra rapide (whip pan) qui révèle le sujet"
+];
+const SHOTS = ["extreme close-up","close-up","medium shot","wide establishing shot","low-angle hero shot","top-down overhead shot","over-the-shoulder shot"];
+const MOVES = ["fast crash push-in during the first half-second","slow cinematic dolly-in","smooth 180° orbit around the subject","handheld tracking shot with natural micro-shake","sweeping drone fly-through","whip pan that reveals the subject","rack focus from foreground to subject"];
+const LENS = ["24mm wide-angle lens","35mm lens","50mm lens","85mm portrait lens","100mm macro lens"];
+
+const BEAT_GUIDE = {
+ fr:["Le fait ou l'étape le plus fort en premier","Une preuve : un chiffre, une source, une démo","Un exemple concret, visuel, que ta cible reconnaît","Le retournement : ce que personne n'attend","L'astuce bonus que les gens vont enregistrer"],
+ en:["Your strongest fact or step first","Proof: a number, a source, a demo","A concrete example your audience recognizes","The twist nobody expects","The bonus tip people will save"]
+};
+const CTA = {
+ fr:{vues:"Envoie ça à quelqu'un qui doit absolument voir ça.",abonnes:"Abonne-toi, la partie 2 sort demain.",engagement:"Et toi, tu savais ? Réponds en commentaire, je réponds à tout le monde.",ventes:"Tout est détaillé dans le lien en bio."},
+ en:{vues:"Send this to someone who needs to see it.",abonnes:"Follow, part 2 drops tomorrow.",engagement:"Did you know? Tell me in the comments, I reply to everyone.",ventes:"Everything is in the link in my bio."}
+};
+const MARKETS = {
+ fr:{tz:"heure de Paris",slots:[["Lun","12:30 · 19:00"],["Mar","12:30 · 19:30"],["Mer","13:00 · 18:00"],["Jeu","12:30 · 20:00"],["Ven","17:00 · 21:00"],["Sam","11:00 · 20:00"],["Dim","10:00 · 19:00"]],broad:["#pourtoi","#fyp"]},
+ ma:{tz:"heure de Casablanca",slots:[["Lun","13:00 · 21:00"],["Mar","13:00 · 21:30"],["Mer","14:00 · 21:00"],["Jeu","13:00 · 22:00"],["Ven","15:00 · 22:00"],["Sam","12:00 · 22:00"],["Dim","12:00 · 21:00"]],broad:["#pourtoi","#maroc"]},
+ qc:{tz:"heure de Montréal",slots:[["Lun","07:30 · 19:00"],["Mar","07:30 · 20:00"],["Mer","12:00 · 19:00"],["Jeu","07:30 · 20:00"],["Ven","12:00 · 21:00"],["Sam","10:00 · 20:00"],["Dim","10:00 · 19:00"]],broad:["#pourtoi","#quebec"]},
+ intl:{tz:"heure de New York",slots:[["Mon","12:00 · 19:00"],["Tue","09:00 · 19:00"],["Wed","12:00 · 20:00"],["Thu","12:00 · 19:00"],["Fri","15:00 · 21:00"],["Sat","11:00 · 19:00"],["Sun","10:00 · 18:00"]],broad:["#fyp","#foryou"]}
+};
+const FORMATS7 = ["Liste chiffrée","Tuto pas à pas","Réponse vidéo à un commentaire","Histoire / storytime","Mythe vs réalité","Épisode de série","Tendance du moment adaptée à la niche"];
+const CHECKS = [
+ ["hook","Hook dit en moins de 2 s, avec du texte à l'écran dès la première image",15],
+ ["move","Mouvement ou rupture visuelle dans la première seconde",10],
+ ["rythm","Un changement visuel toutes les 2 à 3 s (cut, zoom, B-roll, texte)",10],
+ ["subs","Sous-titres lisibles, hors des zones d'interface TikTok",8],
+ ["len","Durée tenue : chaque seconde sert le sujet, pas de remplissage",8],
+ ["loop","La dernière phrase renvoie à la première (boucle)",8],
+ ["seo","Mots-clés dits à voix haute, écrits à l'écran et dans la description",8],
+ ["sound","Son tendance ou voix off claire, volume musique sous la voix",7],
+ ["cta","CTA qui appelle une action précise (commentaire, partage, abonnement)",7],
+ ["time","Publié sur un bon créneau, avec 30 min libres pour répondre aux commentaires",7],
+ ["tech","Export 1080×1920, 30 fps, sans filigrane d'une autre appli",6],
+ ["aigc","Étiquette « contenu généré par IA » activée si les visuels sont réalistes",6]
+];
+
+/* ---------- état ---------- */
+const state = Object.assign({niche:"faits",subject:"",dur:30,tone:"edu",goal:"vues",market:"fr",lang:"fr",format:"faceless",extra:"",seed:1}, store.get("fv-brief", {}));
+let pkg = null;
+let checks = store.get("fv-checks", {});
+let activeTab = store.get("fv-tab", "hooks");
+
+/* ---------- moteur local ---------- */
+function buildLocal(){
+  const n = NICHES[state.niche], L = state.lang, v0 = n[L];
+  const r = rng(state.seed * 7919 + state.niche.length * 31 + state.dur);
+  const S = (state.subject || n.angles[0]).trim();
+  const N = pick(r, [3,5,7]);
+  const vars = {S, N, A:v0.A, R:v0.R, X:v0.X, T:v0.T, D:state.dur};
+  // hooks : priorité au ton
+  const pri = HOOKS.filter(x => x.tones.includes(state.tone)), rest = HOOKS.filter(x => !x.tones.includes(state.tone));
+  const chosen = [...shuffle(r, pri).slice(0,3), ...shuffle(r, rest).slice(0,3)];
+  const hooks = chosen.map((x,i) => ({type:x.type, spoken:cap(fill(x[L][0], vars)), onscreen:cap(fill(x[L][1], vars)), why:x.why, visual:PATTERN[(i + Math.floor(r()*5)) % PATTERN.length]}));
+  const main = hooks[0];
+  // script
+  const nb = {15:2,30:3,45:4,60:5}[state.dur] || 3;
+  const beats = [];
+  const t0 = 0, tHook = 2, tPromise = state.dur <= 15 ? 3 : 5, tEnd = state.dur - (state.dur <= 15 ? 3 : 5);
+  beats.push({t:[t0,tHook], label:"HOOK", voice:main.spoken, onscreen:main.onscreen, visual:main.visual});
+  const promise = L==="fr"
+    ? (state.goal==="abonnes" ? `Et reste jusqu'au bout : le point ${nb} va te surprendre.` : `En ${state.dur} secondes, tu sais tout sur ${S}.`)
+    : (state.goal==="abonnes" ? `Stay till the end, point ${nb} will surprise you.` : `In ${state.dur} seconds you'll know everything about ${S}.`);
+  if (state.dur > 15) beats.push({t:[tHook,tPromise], label: L==="fr"?"PROMESSE":"PROMISE", voice:promise, onscreen: L==="fr"?`${N} points · ${state.dur} s`:`${N} points · ${state.dur}s`, visual:"Cut sec + B-roll du sujet, sous-titres mot par mot"});
+  const span = (tEnd - tPromise) / nb;
+  for (let i=0;i<nb;i++){
+    const a = tPromise + span*i, b = tPromise + span*(i+1);
+    beats.push({t:[a,b], label:(L==="fr"?"POINT ":"POINT ")+(i+1), voice:`[${BEAT_GUIDE[L][i]}] — ${S}.`, onscreen:L==="fr"?`${i+1}. mot-clé du point`:`${i+1}. key word`, visual:`Plan ${i+2} Higgsfield + ${["zoom 110 %","SFX whoosh","texte animé","changement d'angle","flash blanc 2 images"][i%5]}`});
+  }
+  const ctaTxt = CTA[L][state.goal];
+  const loop = L==="fr" ? `…et c'est pour ça que personne ne te parle de ${S}.` : `…and that's exactly why nobody talks about ${S}.`;
+  beats.push({t:[tEnd,state.dur], label:"CTA + BOUCLE", voice:`${ctaTxt} ${loop}`, onscreen:L==="fr"?"Partie 2 ?":"Part 2?", visual:"Retour au plan d'ouverture pour une boucle parfaite"});
+  // plans Higgsfield
+  const scenes = shuffle(r, n.scenes);
+  const nShots = Math.min(scenes.length, nb + 1);
+  const shots = [];
+  for (let i=0;i<nShots;i++){
+    const sc = scenes[i], shot = i===0 ? pick(r,["extreme close-up","low-angle hero shot","close-up"]) : pick(r, SHOTS), move = i===0 ? MOVES[0] : pick(r, MOVES.slice(1)), lens = pick(r, LENS);
+    const image = `${cap(shot)} of ${sc}. Topic: "${S}". Shot on a ${lens}, ${n.light}, ${n.grade}. Style: ${n.look}. ${QUALITY}. ${COMPO}.`;
+    const video = `${cap(sc)}. Camera: ${move}${i===0?" to stop the scroll":""}. Smooth, physically plausible motion with natural 24 fps motion blur, consistent subject identity from first to last frame, no morphing, no flicker. Lighting: ${n.light}. Grade: ${n.grade}. Style: ${n.look}. Sound: ${n.amb}.`;
+    shots.push({name: i===0 ? "Plan 1 · hook" : `Plan ${i+1}`, image, video, negative:NEG});
+  }
+  // descriptions
+  const kw = [S, ...n.tags.n.slice(0,2).map(t=>t.slice(1))];
+  const descs = L==="fr" ? [
+    `${main.onscreen} ${cap(S)} comme personne ne te l'a expliqué. Tu connaissais le point ${N} ?`,
+    `Tout ce qu'il faut savoir sur ${S} en ${state.dur} secondes. Enregistre pour plus tard.`,
+    `${cap(S)} : la vérité que ${v0.A} devraient connaître. ${ctaTxt}`
+  ] : [
+    `${main.onscreen} ${cap(S)} like nobody explained it before. Did you know point ${N}?`,
+    `Everything about ${S} in ${state.dur} seconds. Save this for later.`,
+    `${cap(S)}: what ${v0.A} should know. ${ctaTxt}`
+  ];
+  const m = MARKETS[state.market];
+  const tags = {broad:[m.broad[0]], niche:n.tags.n.slice(0,3), micro:[...n.tags.m.slice(0,2)], en:n.tags.e.slice(0,2)};
+  const pinned = L==="fr" ? `Partie 2 sur ${S} si ce commentaire atteint 100 likes.` : `Part 2 on ${S} if this comment hits 100 likes.`;
+  const series = n.angles.filter(a => a !== S).slice(0,4).map((a,i)=> (L==="fr"?`Épisode ${i+2} : `:`Episode ${i+2}: `) + a);
+  return {source:"local", subject:S, hooks, beats, shots, descs, tags, keywords:kw, pinned, series, cover:main.onscreen, cta:ctaTxt};
+}
+
+/* ---------- Claude ---------- */
+let sample = null, ctl = null;
+(async () => {
+  try { sample = window.claude ? await window.claude.use("sample") : null; } catch { sample = null; }
+  if (sample){ $("#genAI").hidden = false; $("#aiNote").textContent = "Claude écrit un pack sur mesure (utilise ton compte Claude). Les modèles intégrés restent disponibles hors ligne."; }
+})();
+(async () => {
+  try { const d = window.claude ? await window.claude.use("downloads") : null; if (d){ window.__dl = d; $("#dlMd").hidden = false; } } catch {}
+})();
+
+function claudePrompt(){
+  const n = NICHES[state.niche];
+  const langName = state.lang === "fr" ? "French" : "English";
+  return `You are a top TikTok growth strategist and short-form scriptwriter. Build a complete production pack for ONE TikTok video.
+
+BRIEF
+- Niche: ${n.label}
+- Subject: ${state.subject || n.angles[0]}
+- Duration: ${state.dur} seconds
+- Tone: ${$("#tone").selectedOptions[0].textContent}
+- Goal: ${$("#goal").selectedOptions[0].textContent}
+- Market: ${$("#market").selectedOptions[0].textContent}
+- Production format: ${$("#format").selectedOptions[0].textContent}
+- Extra context from the creator: ${state.extra || "none"}
+- Visual identity for this niche: look "${n.look}", lighting "${n.light}", grade "${n.grade}".
+
+RULES
+- All viewer-facing text (hooks, voice, on-screen, descriptions, pinned comment, series) in ${langName}. Image/video prompts in English.
+- Hooks must land in under 2 seconds spoken (max ~12 words), concrete and specific to the subject, no clickbait lies, no guaranteed-income or medical claims.
+- Script beats must cover exactly ${state.dur} seconds, with a visual change every 2-3 s and a final line that loops back to the hook. Write the REAL content of each beat (actual facts/steps), not placeholders.
+- Image prompts: very detailed and rich, for Higgsfield (GPT Image 2.6 / Soul 2.0): shot type, subject, action, environment, lens, lighting, color grade, style, plus quality boosters (ultra-detailed textures, photorealistic materials, shallow depth of field, volumetric atmosphere, HDR, 8K detail) and "vertical 9:16, empty upper third for text, keep subject out of the bottom 20% and right 15%".
+- Video prompts for Seedance 2.5 image-to-video: camera move, subject motion, physics, 24fps motion blur, identity consistency, ambient sound.
+- Hashtags: 1 broad, 3 niche, 2 micro, 2 English; real tags people use. Keywords: 4-6 search phrases people type in TikTok search.
+
+Reply with only JSON of this exact shape:
+{"hooks":[{"type":"","spoken":"","onscreen":"max 6 words","why":"one sentence in French","visual":"first-frame pattern interrupt, in French"}],
+ "beats":[{"t":[0,2],"label":"HOOK","voice":"","onscreen":"","visual":"in French"}],
+ "shots":[{"name":"Plan 1 · hook","image":"","video":"","negative":""}],
+ "descs":["","",""],
+ "tags":{"broad":["#..."],"niche":["#..."],"micro":["#..."],"en":["#..."]},
+ "keywords":[""], "pinned":"", "series":["","","",""], "cover":"max 5 words for the cover", "cta":""}
+Give 6 hooks (best first), ${ {15:4,30:6,45:7,60:8}[state.dur] } beats, ${ Math.min(5, {15:3,30:4,45:5,60:5}[state.dur]) } shots.`;
+}
+
+async function genClaude(){
+  if (!sample) return;
+  const btn = $("#genAI"), st = $("#status");
+  if (ctl){ ctl.abort(); return; }
+  ctl = new AbortController();
+  btn.textContent = "Arrêter"; st.className = "status"; st.textContent = "Claude réfléchit… (20 à 60 s)";
+  try {
+    const res = await sample.json(claudePrompt(), {signal:ctl.signal, modelTier:"default", onText:({text}) => { st.textContent = `Claude écrit… ${Math.round(text.length/100)/10} k caractères`; }});
+    const p = normalize(res);
+    if (!p) throw {code:"invalid_json"};
+    pkg = p; saveRecent(); renderAll(); st.textContent = "Pack écrit par Claude.";
+  } catch (e){
+    st.className = "status err";
+    st.textContent = ({cancelled:"Génération arrêtée.", not_granted:"Accès à Claude refusé : les modèles intégrés restent dispo.", rate_limited:"Trop de demandes, réessaie dans une minute.", invalid_json:"Réponse illisible, relance la génération."})[e?.code] || "Génération impossible pour le moment. Utilise les modèles intégrés.";
+    if (e?.code === "not_granted") btn.hidden = true;
+  } finally { ctl = null; btn.textContent = "Générer avec Claude"; }
+}
+function normalize(x){
+  if (!x || !Array.isArray(x.hooks) || !x.hooks.length || !Array.isArray(x.beats)) return null;
+  const s = v => typeof v === "string" ? v : (v == null ? "" : String(v));
+  const arr = v => Array.isArray(v) ? v : [];
+  const tg = x.tags || {};
+  return {
+    source:"claude", subject: state.subject || NICHES[state.niche].angles[0],
+    hooks: arr(x.hooks).slice(0,8).map(k=>({type:s(k.type),spoken:s(k.spoken),onscreen:s(k.onscreen),why:s(k.why),visual:s(k.visual)})),
+    beats: arr(x.beats).slice(0,12).map(b=>({t:Array.isArray(b.t)?[+b.t[0]||0,+b.t[1]||0]:[0,0],label:s(b.label),voice:s(b.voice),onscreen:s(b.onscreen),visual:s(b.visual)})),
+    shots: arr(x.shots).slice(0,6).map(k=>({name:s(k.name),image:s(k.image),video:s(k.video),negative:s(k.negative)||NEG})),
+    descs: arr(x.descs).map(s).slice(0,4),
+    tags:{broad:arr(tg.broad).map(s),niche:arr(tg.niche).map(s),micro:arr(tg.micro).map(s),en:arr(tg.en).map(s)},
+    keywords: arr(x.keywords).map(s), pinned:s(x.pinned), series:arr(x.series).map(s), cover:s(x.cover), cta:s(x.cta)
+  };
+}
+
+/* ---------- rendu ---------- */
+const TABS = [["hooks","Hooks"],["script","Script"],["higgs","Higgsfield"],["express","Adobe Express"],["caption","Description"],["publish","Publication"],["growth","Croissance"]];
+function renderTabs(){
+  const tl = $("#tabs"); tl.replaceChildren();
+  for (const [id,label] of TABS){
+    tl.append(h("button",{role:"tab",type:"button",id:"tab-"+id,"aria-selected":String(id===activeTab),"aria-controls":"panel-"+id,onclick:()=>{ activeTab=id; store.set("fv-tab",id); renderTabs(); renderPanel(); }},label));
+  }
+}
+function secHead(title, copyText){ return h("div",{class:"sec-h"}, h("h3",null,title), copyText ? copyBtn(copyText, "Tout copier") : null); }
+
+function renderPanel(){
+  const wrap = $("#panels"); wrap.replaceChildren();
+  const p = h("div",{class:"tabpanel",role:"tabpanel",id:"panel-"+activeTab,"aria-labelledby":"tab-"+activeTab});
+  wrap.append(p);
+  const n = NICHES[state.niche];
+  if (activeTab === "hooks"){
+    p.append(secHead("6 hooks à tester", () => pkg.hooks.map(k=>`[${k.type}] ${k.spoken}  |  écran : ${k.onscreen}`).join("\n")),
+      h("p",{class:"hint"},"Le premier est recommandé pour ton ton. Garde le même corps de vidéo et republie avec un autre hook 48 h plus tard : c'est le test A/B le plus fiable sur TikTok."));
+    const l = h("div",{class:"list"});
+    pkg.hooks.forEach((k,i) => l.append(h("div",{class:"item"+(i===0?" best":"")},
+      h("div",{class:"item-top"}, h("span",{class:"tag"},k.type), i===0 ? h("span",{class:"star"},"RECOMMANDÉ") : copyBtn(k.spoken)),
+      h("div",{class:"say"},k.spoken),
+      h("div",{class:"scr"},"Texte écran : ", h("b",null,k.onscreen)),
+      k.visual ? h("div",{class:"scr"},"Première image : "+k.visual) : null,
+      h("div",{class:"why"},k.why),
+      i===0 ? h("div",null, copyBtn(k.spoken)) : null)));
+    p.append(l);
+  }
+  if (activeTab === "script"){
+    p.append(secHead(`Script ${state.dur} s`, () => pkg.beats.map(b=>`${mmss(b.t[0])}–${mmss(b.t[1])} ${b.label}\nVoix : ${b.voice}\nÉcran : ${b.onscreen}\nVisuel : ${b.visual}`).join("\n\n")));
+    if (pkg.source === "local") p.append(h("p",{class:"hint"},"Les crochets indiquent quoi dire à chaque point. Remplace-les par ton contenu, ou lance « Générer avec Claude » pour un script rédigé en entier."));
+    const tb = h("tbody");
+    pkg.beats.forEach(b => tb.append(h("tr",null, h("td",{class:"t"},`${mmss(b.t[0])}–${mmss(b.t[1])}`), h("td",null,h("b",null,b.label)), h("td",null,b.voice), h("td",null,b.onscreen), h("td",null,b.visual))));
+    p.append(h("div",{class:"tl"}, h("table",null, h("thead",null,h("tr",null,h("th",null,"Temps"),h("th",null,"Bloc"),h("th",null,"Voix off"),h("th",null,"Texte écran"),h("th",null,"Visuel / montage"))), tb)));
+    p.append(h("div",{class:"grid2"},
+      h("div",{class:"item"}, h("span",{class:"tag"},"Voix off"), h("div",{class:"scr"},"Voix IA : Higgsfield (generate_audio) ou ElevenLabs. Débit 165 à 180 mots/min, pas de silence de plus de 0,4 s."), copyBtn(()=>pkg.beats.map(b=>b.voice).join(" "),"Copier le texte à lire")),
+      h("div",{class:"item"}, h("span",{class:"tag"},"Son"), h("div",{class:"scr"}, n.sound + ". Musique à −18 dB sous la voix, SFX sur chaque cut."))));
+  }
+  if (activeTab === "higgs"){
+    p.append(secHead("Prompts Higgsfield", () => pkg.shots.map(s=>`${s.name}\nIMAGE : ${s.image}\nNEGATIVE : ${s.negative}\nVIDÉO : ${s.video}`).join("\n\n")),
+      h("p",{class:"hint"},"Méthode : génère d'abord l'image clé de chaque plan (contrôle total du cadrage), puis anime-la en image-to-video. Garde le même seed et les mêmes références d'un plan à l'autre pour la cohérence."));
+    const fmt = state.format;
+    const imgModel = fmt==="facecam"||fmt==="ugc" ? "soul_2 (Soul 2.0) pour les personnes réalistes" : (state.niche==="pov"||state.niche==="animaux" ? "gpt_image_2_6, ou nano_banana_2 pour un personnage illustré" : "gpt_image_2_6 (GPT Image 2.6), qualité high, 2k");
+    const vidModel = fmt==="ugc" ? "marketing_studio_video (UGC produit, 12 à 15 s)" : "seedance_2_5 (Seedance 2.5) · premium : cinematic_studio_3_0";
+    p.append(h("div",{class:"item"}, h("span",{class:"tag"},"Réglages"),
+      h("dl",{class:"kv"},
+        h("dt",null,"Modèle image"),h("dd",null,imgModel),
+        h("dt",null,"Modèle vidéo"),h("dd",null,vidModel),
+        h("dt",null,"Format"),h("dd",null,"aspect_ratio 9:16 · 1080p · 5 s par plan (hook : 4 s)"),
+        h("dt",null,"Audio"),h("dd",null,state.format==="text"?"generate_audio: false (musique tendance ajoutée sur TikTok)":"generate_audio: true pour l'ambiance, voix off séparée"),
+        h("dt",null,"Finition"),h("dd",null,"upscale_video si rendu en 720p · reframe pour adapter un plan 16:9"))));
+    pkg.shots.forEach(s => p.append(h("div",{class:"item"},
+      h("div",{class:"item-top"}, h("span",{class:"tag"},s.name), copyBtn(s.image,"Copier l'image")),
+      h("span",{class:"lbl"},"Image clé"), h("pre",{class:"prompt"},s.image),
+      h("div",{class:"neg"},"Negative : "+s.negative),
+      h("div",{class:"item-top"}, h("span",{class:"lbl"},"Animation (image-to-video)"), copyBtn(s.video,"Copier la vidéo")),
+      h("pre",{class:"prompt"},s.video))));
+    p.append(h("div",{class:"item"}, h("span",{class:"tag"},"Avec Claude Code"), h("div",{class:"scr"},"Dans ce dépôt, lance le skill /tiktok-viral-studio : il génère les images et les vidéos sur ton compte Higgsfield, puis passe la vidéo au Virality Predictor avant publication.")));
+  }
+  if (activeTab === "express"){
+    const pal = n.palette;
+    p.append(secHead("Brief Adobe Express", () => expressBrief()),
+      h("p",{class:"hint"},"La cover apparaît dans ta grille de profil et dans la recherche TikTok : elle doit être lisible en vignette, avec 5 mots au maximum."));
+    p.append(h("div",{class:"grid2"},
+      h("div",{class:"item"}, h("span",{class:"tag"},"Cover 1080 × 1920"),
+        h("div",{class:"say"},pkg.cover || pkg.hooks[0].onscreen),
+        h("dl",{class:"kv"}, h("dt",null,"Polices"),h("dd",null,n.fonts), h("dt",null,"Zone texte"),h("dd",null,"y 300–760 px, marges 90 px"), h("dt",null,"Lisibilité"),h("dd",null,"contour 8 px ou bandeau 35 % noir")),
+        h("div",{class:"swatches"}, pal.map(c => h("span",{class:"sw"}, h("i",{style:`background:${c}`}), c)))),
+      h("div",{class:"item"}, h("span",{class:"tag"},"Sous-titres"),
+        h("dl",{class:"kv"}, h("dt",null,"Style"),h("dd",null,"mot par mot, 2 à 4 mots par ligne"), h("dt",null,"Taille"),h("dd",null,"64–72 px, graisse 800"), h("dt",null,"Accent"),h("dd",null,`mot-clé en ${pal[1]}`), h("dt",null,"Position"),h("dd",null,"centre, y 1100–1350 px"))),
+      h("div",{class:"item"}, h("span",{class:"tag"},"Modèles à chercher"),
+        h("div",{class:"ht"}, [`TikTok ${n.label.split(" ")[0].toLowerCase()}`,"TikTok cover bold text","video caption template","story 9:16 "+n.look.split(" ")[0]].map(q=>h("span",null,q))))));
+    p.append(h("div",{class:"item"}, h("span",{class:"tag"},"Montage dans Adobe Express"),
+      h("ol",{class:"steps"},
+        h("li",null,"Créer › Vidéo › TikTok (1080 × 1920). Importer les plans Higgsfield dans l'ordre du script."),
+        h("li",null,"Couper chaque plan sur le temps du script, ajouter la voix off, puis « Sous-titres automatiques » avec le style ci-dessus."),
+        h("li",null,"Ajouter le texte du hook sur les 2 premières secondes, dans la zone haute."),
+        h("li",null,"Créer une page Cover séparée avec le texte de cover, la palette et les polices."),
+        h("li",null,"Exporter en MP4 1080p. Redimensionner en Reels et Shorts pour republier sans filigrane."))));
+  }
+  if (activeTab === "caption"){
+    const t = pkg.tags, all = [...t.broad, ...t.niche, ...t.micro, ...t.en];
+    p.append(secHead("Description & hashtags"),
+      h("p",{class:"hint"},"Les premiers mots de la description comptent pour la recherche TikTok : place le mot-clé principal en premier. 4 à 6 hashtags ciblés valent mieux que 20 génériques."));
+    const l = h("div",{class:"list"});
+    pkg.descs.forEach((d,i) => { const full = `${d}\n\n${all.slice(0,6).join(" ")}`; l.append(h("div",{class:"item"+(i===0?" best":"")}, h("div",{class:"item-top"}, h("span",{class:"tag"},["Curiosité","Valeur","Communauté","Variante"][i]||"Variante"), copyBtn(full)), h("div",{class:"say",style:"font-size:15px;font-weight:500"},d), h("div",{class:"neg"},`${d.length} caractères · ${all.slice(0,6).join(" ")}`))); });
+    p.append(l);
+    p.append(h("div",{class:"grid2"},
+      h("div",{class:"item"}, h("div",{class:"item-top"},h("span",{class:"tag"},"Hashtags"),copyBtn(all.join(" "))),
+        h("div",{class:"ht"}, t.broad.map(x=>h("span",{class:"b"},x)), t.niche.map(x=>h("span",{class:"n"},x)), t.micro.map(x=>h("span",null,x)), t.en.map(x=>h("span",null,x))),
+        h("div",{class:"why"},"Bleu : large (1 max). Rose : niche, le cœur du ciblage. Gris : micro-niches et anglais pour élargir.")),
+      h("div",{class:"item"}, h("div",{class:"item-top"},h("span",{class:"tag"},"Mots-clés SEO TikTok"),copyBtn(pkg.keywords.join(", "))),
+        h("div",{class:"ht"}, pkg.keywords.map(x=>h("span",null,x))),
+        h("div",{class:"why"},"À dire dans les 5 premières secondes, à écrire à l'écran et dans la description.")),
+      h("div",{class:"item"}, h("div",{class:"item-top"},h("span",{class:"tag"},"Commentaire épinglé"),copyBtn(pkg.pinned)), h("div",{class:"scr"},pkg.pinned), h("div",{class:"why"},"Publie-le toi-même dans la minute, puis épingle-le."))));
+  }
+  if (activeTab === "publish"){
+    const m = MARKETS[state.market];
+    p.append(secHead("Checklist avant publication"), h("p",{class:"hint"},"Chaque point coché augmente le score de préparation. Il mesure ce que tu contrôles, pas une garantie de vues."));
+    const c = h("div",{class:"checks"});
+    CHECKS.forEach(([id,label,w]) => {
+      const cb = h("input",{type:"checkbox",id:"ck-"+id}); cb.checked = !!checks[id];
+      cb.addEventListener("change", () => { checks[id] = cb.checked; store.set("fv-checks", checks); renderScore(); });
+      c.append(h("label",{for:"ck-"+id}, cb, h("span",null,label), h("small",null,`+${w}`)));
+    });
+    p.append(c);
+    if (n.care) p.append(h("div",{class:"item"}, h("span",{class:"tag",style:"color:var(--warn)"},"Attention dans cette niche"), h("div",{class:"scr"},n.care)));
+    const tb = h("tbody"); m.slots.forEach(([d,s]) => tb.append(h("tr",null,h("td",null,h("b",null,d)),h("td",{class:"t"},s))));
+    p.append(h("h3",{style:"font-size:17px;margin-top:6px"},`Créneaux de départ (${m.tz})`),
+      h("div",{class:"tl"},h("table",{style:"min-width:0"},h("thead",null,h("tr",null,h("th",null,"Jour"),h("th",null,"Heures"))),tb)),
+      h("p",{class:"hint"},"Après 2 semaines, remplace ces repères par l'onglet « Followers › activité » de tes Analytics."));
+    p.append(h("div",{class:"item"}, h("span",{class:"tag"},"Les 60 premières minutes"),
+      h("ol",{class:"steps"}, h("li",null,"Publie, puis poste et épingle le commentaire préparé."), h("li",null,"Réponds à chaque commentaire, en vidéo pour les meilleurs : chaque réponse est un nouveau contenu."), h("li",null,"Partage en story et dans 1 ou 2 groupes de la niche, pas plus."), h("li",null,"Ne supprime pas une vidéo qui démarre lentement : TikTok la pousse parfois après 24 à 72 h."))));
+  }
+  if (activeTab === "growth"){
+    const m = MARKETS[state.market];
+    p.append(secHead("Plan sur 7 jours"), h("p",{class:"hint"},"Une niche, un format qui tourne, une publication par jour. La régularité apprend à l'algorithme qui est ton audience."));
+    const cal = h("div",{class:"cal"});
+    const angles = [pkg.subject, ...n.angles.filter(a=>a!==pkg.subject)];
+    m.slots.forEach(([d,s],i) => cal.append(h("div",{class:"day"}, h("b",null,d), h("span",{class:"when"},s.split(" · ")[1] || s), h("span",null,FORMATS7[i]), h("span",{style:"color:var(--muted)"}, angles[i % angles.length]))));
+    p.append(cal);
+    p.append(h("div",{class:"grid2"},
+      h("div",{class:"item"}, h("div",{class:"item-top"},h("span",{class:"tag"},"Série (fidélisation)"),copyBtn(pkg.series.join("\n"))), h("ol",{class:"steps"}, pkg.series.map(x=>h("li",null,x))), h("div",{class:"why"},"Annonce « partie 2 » dans le CTA : les séries convertissent les vues en abonnés.")),
+      h("div",{class:"item"}, h("span",{class:"tag"},"Leviers de croissance"),
+        h("ol",{class:"steps"},
+          h("li",null,"Recycle un hook gagnant sur 3 sujets de la même niche."),
+          h("li",null,"Stitch ou duo une vidéo virale de ta niche dans les 24 h."),
+          h("li",null,"Transforme les questions en commentaires en vidéos réponses."),
+          h("li",null,"Carrousel photo du même sujet : TikTok les pousse aussi dans le fil."),
+          h("li",null,"Republie sur Reels et Shorts sans filigrane, 24 h après TikTok."))),
+      h("div",{class:"item"}, h("span",{class:"tag"},"Ce qu'il faut suivre"),
+        h("dl",{class:"kv"}, h("dt",null,"Rétention à 3 s"),h("dd",null,"> 70 % : le hook marche"), h("dt",null,"Visionnage complet"),h("dd",null,"> 40 % sur 15–30 s"), h("dt",null,"Partages / vues"),h("dd",null,"> 1 % : vidéo à décliner"), h("dt",null,"Abonnés / 1 000 vues"),h("dd",null,"> 5 : la niche accroche")))));
+  }
+}
+function renderHero(){
+  const n = NICHES[state.niche], k = pkg.hooks[0];
+  $("#heroEyebrow").textContent = `${n.label} · ${state.dur} s · ${state.lang.toUpperCase()}`;
+  $("#heroHook").textContent = k.spoken;
+  const ov = $("#phoneText"); ov.replaceChildren(h("span",null,k.onscreen));
+  const [c1,c2] = n.palette;
+  $("#phoneBg").style.background = `radial-gradient(120% 70% at 70% 30%, ${c2}55, transparent 60%), linear-gradient(160deg, ${c1}, #000 95%)`;
+  $("#heroMeta").replaceChildren(
+    h("span",{class:"pill src"}, pkg.source==="claude" ? "Écrit par Claude" : "Modèles intégrés"),
+    h("span",{class:"pill"}, pkg.subject),
+    h("span",{class:"pill"}, $("#goal").selectedOptions[0].textContent),
+    h("span",{class:"pill"}, `${pkg.shots.length} plans Higgsfield`));
+}
+function renderScore(){
+  let sc = 0; for (const [id,,w] of CHECKS) if (checks[id]) sc += w;
+  const circ = 2*Math.PI*27;
+  $("#gArc").setAttribute("stroke-dasharray", `${(sc/100)*circ} ${circ}`);
+  $("#gArc").setAttribute("stroke", sc >= 80 ? "var(--good)" : sc >= 50 ? "var(--warn)" : "var(--accent)");
+  $("#gTxt").textContent = sc;
+  $("#scoreHint").textContent = sc >= 80 ? "Prête à publier." : sc >= 50 ? "Presque : vérifie les points non cochés." : "Coche la checklist dans l'onglet Publication.";
+}
+function renderAll(){ renderHero(); renderTabs(); renderPanel(); renderScore(); }
+
+/* ---------- export ---------- */
+function expressBrief(){
+  const n = NICHES[state.niche];
+  return `COVER 1080x1920 : "${pkg.cover || pkg.hooks[0].onscreen}"\nPolices : ${n.fonts}\nPalette : ${n.palette.join(", ")}\nZone texte : y 300–760 px, marges 90 px, contour 8 px\nSous-titres : mot par mot, 64–72 px, mot-clé en ${n.palette[1]}, y 1100–1350 px`;
+}
+function toMarkdown(){
+  const n = NICHES[state.niche], t = pkg.tags;
+  const L = [];
+  L.push(`# Pack TikTok — ${pkg.subject}`, `${n.label} · ${state.dur} s · objectif : ${$("#goal").selectedOptions[0].textContent}`, "");
+  L.push("## Hooks"); pkg.hooks.forEach((k,i)=>L.push(`${i+1}. **${k.spoken}** — écran : « ${k.onscreen} » (${k.type})`)); L.push("");
+  L.push("## Script"); pkg.beats.forEach(b=>L.push(`- **${mmss(b.t[0])}–${mmss(b.t[1])} ${b.label}** · Voix : ${b.voice} · Écran : ${b.onscreen} · Visuel : ${b.visual}`)); L.push("");
+  L.push("## Prompts Higgsfield (9:16, 1080p)"); pkg.shots.forEach(s=>{ L.push(`### ${s.name}`, "Image :", "```", s.image, "```", `Negative : ${s.negative}`, "Vidéo :", "```", s.video, "```"); }); L.push("");
+  L.push("## Adobe Express", "```", expressBrief(), "```", "");
+  L.push("## Descriptions"); pkg.descs.forEach(d=>L.push(`- ${d}`)); L.push("");
+  L.push("## Hashtags", [...t.broad,...t.niche,...t.micro,...t.en].join(" "), "", `Mots-clés : ${pkg.keywords.join(", ")}`, "", `Commentaire épinglé : ${pkg.pinned}`, "");
+  L.push("## Série"); pkg.series.forEach(s=>L.push(`- ${s}`));
+  return L.join("\n");
+}
+$("#copyAll").addEventListener("click", e => copy(toMarkdown(), e.currentTarget));
+$("#dlMd").addEventListener("click", async () => {
+  try { await window.__dl.save({filename:`tiktok-${(pkg.subject||"pack").toLowerCase().replace(/[^a-z0-9]+/gi,"-").slice(0,40)}.md`, data:toMarkdown()}); }
+  catch (e){ if (e?.code === "unavailable"){ $("#dlMd").hidden = true; } }
+});
+
+/* ---------- récents ---------- */
+function saveRecent(){
+  const list = store.get("fv-recent", []).filter(x => !(x.brief.subject===pkg.subject && x.brief.niche===state.niche && x.pkg.source===pkg.source));
+  list.unshift({brief:{...state}, pkg}); store.set("fv-recent", list.slice(0,8)); renderRecent();
+}
+function renderRecent(){
+  const list = store.get("fv-recent", []), box = $("#recent");
+  box.querySelectorAll("button").forEach(b=>b.remove());
+  box.hidden = !list.length;
+  list.forEach(x => box.append(h("button",{type:"button",title:x.pkg.hooks?.[0]?.spoken || "", onclick:()=>{ Object.assign(state, x.brief); pkg = x.pkg; syncForm(); renderAngles(); renderAll(); }}, `${x.pkg.source==="claude"?"Claude · ":""}${x.pkg.subject} — ${NICHES[x.brief.niche]?.label || ""}`)));
+}
+
+/* ---------- formulaire ---------- */
+const nicheSel = $("#niche");
+for (const [id,n] of Object.entries(NICHES)) nicheSel.append(h("option",{value:id},n.label));
+function renderAngles(){
+  const box = $("#angleChips"); box.replaceChildren();
+  NICHES[state.niche].angles.forEach(a => box.append(h("button",{class:"chip",type:"button",onclick:()=>{ $("#subject").value = a; state.subject = a; persist(); regen(); }},a)));
+  $("#subject").placeholder = NICHES[state.niche].angles[0];
+}
+function syncForm(){
+  if (!NICHES[state.niche]) state.niche = "faits";
+  nicheSel.value = state.niche; $("#subject").value = state.subject; $("#dur").value = String(state.dur); $("#tone").value = state.tone;
+  $("#goal").value = state.goal; $("#market").value = state.market; $("#format").value = state.format; $("#extra").value = state.extra;
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === state.lang)));
+}
+function persist(){ store.set("fv-brief", state); }
+function readForm(){
+  state.niche = nicheSel.value; state.subject = $("#subject").value.trim(); state.dur = +$("#dur").value; state.tone = $("#tone").value;
+  state.goal = $("#goal").value; state.market = $("#market").value; state.format = $("#format").value; state.extra = $("#extra").value.trim();
+  persist();
+}
+function regen(){ pkg = buildLocal(); renderAll(); }
+nicheSel.addEventListener("change", () => { readForm(); state.subject = ""; $("#subject").value = ""; persist(); renderAngles(); regen(); });
+["dur","tone","goal","market","format"].forEach(id => $("#"+id).addEventListener("change", () => { readForm(); if (!pkg || pkg.source==="local") regen(); else renderAll(); }));
+$("#subject").addEventListener("change", () => { readForm(); regen(); });
+$("#extra").addEventListener("change", readForm);
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { state.lang = b.dataset.lang; persist(); syncForm(); regen(); }));
+$("#genLocal").addEventListener("click", () => { readForm(); state.seed++; persist(); regen(); saveRecent(); $("#status").className="status"; $("#status").textContent = "Nouvelle variante générée."; });
+$("#genAI").addEventListener("click", () => { readForm(); genClaude(); });
+
+syncForm(); renderAngles(); regen(); renderRecent();
+</script>
